@@ -1,7 +1,7 @@
 {
   "name": "fazen-memory",
   "displayName": "Fazen Memory",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Keeps long Claude Code chats on track: a code word that proves the rules are still followed, checkpoints, an automatic handoff to a fresh chat when the context gets too long, and automatic yes to obvious continuation questions.",
   "author": {
     "name": "FazenDev"

@@ -358,6 +358,41 @@ out = run("on_stop.py", {"session_id": s23, "transcript_path": long_turn("Archiv
 check("long turn: code word in neither -> miss + block", out.get("decision") == "block"
       and "code word" in out.get("reason", ""), out)
 
+# 24. /fazenmemory status reports what the hooks really saw, and warns when their state was lost
+#     (seen live: a cleanup hook emptied the plugin data folder before every Bash call)
+def chat(*prompts):
+    path = os.path.join(tempfile.gettempdir(), "fm_t_%s.jsonl" % uuid.uuid4().hex)
+    rows = []
+    for p in prompts:
+        rows += [{"type": "user", "message": {"content": p}},
+                 {"type": "user", "isMeta": True, "message": {"content": "Base directory for this skill: ..."}},
+                 {"type": "user", "message": {"content": [{"type": "tool_result", "content": "ok"}]}},
+                 {"type": "assistant", "message": {"content": [{"type": "text", "text": "Si Fratello! ok"}]}}]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(json.dumps(r) for r in rows) + "\n")
+    return path
+
+s24 = new_session()
+run("on_prompt.py", {"session_id": s24, "prompt": "/fazenmemory"})
+run("on_prompt.py", {"session_id": s24, "prompt": "vai"})
+out = run("on_prompt.py", {"session_id": s24, "prompt": "/fazenmemory status",
+                           "transcript_path": chat("/fazenmemory", "vai")})
+note = note_of(out)
+check("status: note with the hooks' data", "status" in note and "on" in note and "Si Fratello!" in note
+      and "3" in note, note)
+check("status: no warning when nothing was lost", "Warning" not in note, note)
+check("status does not change on/off", state_of(s24).get("enabled"), state_of(s24))
+out = run("on_prompt.py", {"session_id": s24, "prompt": "/fazenmemory status",
+                           "transcript_path": chat("/fazenmemory", "vai", "/fazenmemory status", "/fazenmemory status")})
+check("status: current prompt already in the transcript -> no warning", "Warning" not in note_of(out), note_of(out))
+s24 = new_session()
+out = run("on_prompt.py", {"session_id": s24, "prompt": "/fazenmemory status",
+                           "transcript_path": chat("/fazenmemory", "a", "b", "c", "d")})
+note = note_of(out)
+check("status: state lost -> warning naming the state folder", "Warning" in note and "5" in note
+      and STATE in note, note)
+check("status in an off chat: says off, stays off", " off" in note and not state_of(s24).get("enabled"), note)
+
 shutil.rmtree(DATA, ignore_errors=True)
 print("\nRESULT:", "ALL PASS" if not fails else "FAILED: %s" % fails)
 sys.exit(1 if fails else 0)

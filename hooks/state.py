@@ -161,6 +161,34 @@ def tail_entries(transcript_path):
     return entries
 
 
+def user_prompts(transcript_path):
+    """(number of messages the user typed in this chat, text of the last one).
+
+    Reads the whole transcript, so only /fazenmemory status calls it. Tool results, skill
+    bodies and hook feedback are logged as user entries too; they are not prompts.
+    """
+    count, last = 0, ""
+    try:
+        with open(transcript_path, "rb") as f:
+            for line in f:
+                # Cheap byte filters first: parsing every line of a big transcript is too slow.
+                if b'"user"' not in line or b'"tool_result"' in line:
+                    continue
+                try:
+                    e = json.loads(line.decode("utf-8"))
+                except (ValueError, UnicodeDecodeError):
+                    continue
+                if e.get("type") != "user" or e.get("isMeta") or e.get("isSidechain") or e.get("isCompactSummary"):
+                    continue
+                content = (e.get("message") or {}).get("content")
+                if isinstance(content, list):
+                    content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
+                count, last = count + 1, content or ""
+    except (OSError, TypeError):
+        return (0, "")
+    return (count, last)
+
+
 def context_tokens(transcript_path):
     """Context size of the latest assistant call: input + cache creation + cache read."""
     for entry in reversed(tail_entries(transcript_path)):
