@@ -12,8 +12,6 @@ watches every chat with two small hooks. When the chat gets too long, or Claude 
 rules, it writes a complete handoff file and continues in a new chat in the same folder. The handoff
 carries every rule, correction and exact value over, so nothing is lost.
 
-A fork of [active-memory](https://github.com/Klopyy/active-memory) 0.2.6 (MIT).
-
 ## How it works
 
 Fazen Memory is **off** in every chat until you type `/fazenmemory`. Once it is on, every exchange
