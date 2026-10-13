@@ -152,7 +152,7 @@ If this chat itself started from a Fazen Memory (or active-memory) handoff file:
 
 ## Save the file
 
-1. Working folder = the session's current working directory. If it is a scratch / "No folder" workspace or not a real project, AUTO mode cannot continue there: save the file, show it with SendUserFile, and use the manual guide below.
+1. Working folder = the session's current working directory. If it is a scratch / "No folder" workspace (deleted with the session), the working folder is instead the real project folder the work in this chat touched (e.g. the repo whose files were edited); if there is none, save the file, show it with SendUserFile, and use the manual guide below.
 2. Path: `<working folder>/.claude/handoffs/handoff-<project-name>.md` (lowercase, hyphens). Same file for chained handoffs (the lineage keeps the history).
 3. In a git repo, make sure the handoff is not committed: `git check-ignore -q .claude/handoffs/x`; if it is not ignored, add the line `.claude/handoffs/` to `.gitignore` (only that folder: repos often commit `.claude/settings.json` or project skills on purpose).
 4. Verify the file exists and is complete (Read its last lines: the audit line must be there).
@@ -161,7 +161,7 @@ If this chat itself started from a Fazen Memory (or active-memory) handoff file:
 
 Do every step; verify instead of assuming. Use the session-management tools, which are deferred: load them first.
 
-1. **Load tools.** `ToolSearch` with `select:mcp__ccd_session_mgmt__hand_off_to_session,mcp__ccd_session_mgmt__start_session,mcp__ccd_session_mgmt__set_session_permission_mode,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__get_session,mcp__ccd_window__open_session_in,mcp__ccd_session__spawn_task`. Use only what comes back; never call a tool that did not load.
+1. **Load tools.** `ToolSearch` with `select:mcp__ccd_session_mgmt__hand_off_to_session,mcp__ccd_session_mgmt__start_session,mcp__ccd_session_mgmt__set_session_permission_mode,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__get_session,mcp__ccd_window__open_session_in,mcp__terminal__run_in_terminal,mcp__terminal__read_terminal,mcp__ccd_session__spawn_task`. Use only what comes back; never call a tool that did not load.
 2. **Resume message** (the first message of the new chat), in the chat's language:
    ``Fazen Memory resume: leggi per intero `<absolute path of the handoff file>` e segui la sezione 0. Cartella di lavoro: `<absolute working folder>`.``
    Keep this exact wording and the backticks around the path: the Fazen Memory hook reads the path from it to re-arm the code word in the new chat.
@@ -170,13 +170,20 @@ Do every step; verify instead of assuming. Use the session-management tools, whi
    2. `set_session_title` if the title was not set at start.
    3. `open_session_in(<new id>, "focus")`; if it is refused, try `"split"`; if that is refused too, just give the link.
    4. **Verify** with `get_session(<new id>)`: it exists, is in the same folder, `permissionMode` is `auto`. Report what is not true instead of claiming it.
-4. **Fallback: no session-starting tool, `spawn_task` loaded.** The chip starts a new chat in its own worktree, which does not see uncommitted changes.
+4. **Terminal path (zero clicks; verified live 2026-10-13): no session-starting tool, `run_in_terminal` loaded.** A Claude Code session in a tab of the app's Terminal panel, in the same folder, no worktree.
+   1. Read the app's own Claude Code executable with Bash: `echo "$CLAUDE_CODE_EXECPATH"` (same version as the app, so it supports the same models; the npm `claude` can be too old). If it is empty, use `claude`.
+   2. `run_in_terminal` without `cwd` (the tool refuses folders outside this session) and with `command`, one line, printable ASCII only, **no backticks, no `$variables`**:
+      `Set-Location '<working folder>'; <exe path> --model <this chat's model id> --permission-mode auto 'Fazen Memory resume: leggi per intero <absolute path of the handoff file> e segui la sezione 0. Cartella di lavoro: <working folder>.'`
+      (the hook also reads the path without backticks). Title: `<project> #<n>`.
+   3. **Verify** with `read_terminal` (wait 30-60s): the header shows the right folder, the model, `Claude Max` (or the account's plan) and `auto mode on`, and the session starts reading the handoff file. If the header shows API billing, a version error or a login prompt, stop the tab and report it instead of claiming the handoff worked.
+   4. Edits inside `~/.claude` still ask for approval in that session even in auto mode (protected folder): say so if the next step touches it.
+5. **Fallback: `spawn_task` loaded.** The chip starts a new chat in its own worktree, which does not see uncommitted changes.
    1. If `git status --short` shows uncommitted changes, tell the user in one line which files are uncommitted and ask whether to commit them first (committing is their call). Their answer comes before the chip.
    2. `spawn_task` with `cwd` = the working folder, `title` = `Continua <project> (handoff #<n>)`, `tldr` = why (chat too long, handoff #n ready), `prompt` = the resume message plus: `Prima azione: passa questa sessione in modalità auto con set_session_permission_mode("self", "auto").`
    3. The user needs one click on the chip. Say so plainly; do not claim the new chat is running.
-5. **Neither path available:** use the manual guide below.
-6. Do not archive this chat. It stays as it is; offer archiving in one line, only do it if the user says yes.
-7. **This chat stops working on the task.** From here on the new chat owns the folder: two chats editing the same files collide. If the user writes here again about the task, remind them in one line that the work moved (with the link) and do not edit files, unless they explicitly ask to keep working here.
+6. **No path available:** use the manual guide below.
+7. Do not archive this chat. It stays as it is; offer archiving in one line, only do it if the user says yes.
+8. **This chat stops working on the task.** From here on the new chat owns the folder: two chats editing the same files collide. If the user writes here again about the task, remind them in one line that the work moved (with the link) and do not edit files, unless they explicitly ask to keep working here.
 
 ## Final reply (AUTO mode)
 
@@ -190,7 +197,8 @@ Start with the code word if one is active. Then, short, in the user's language:
 Questa chat resta aperta; se vuoi la archivio.
 ```
 
-In the fallback path replace the first line with: `🔁 **Handoff #<n> pronto.** Clicca il chip "<title>" qui sotto: apre la nuova chat e riparte da sola.`
+In the Terminal path the first line is: `🔁 **Siamo passati a questa nuova chat:** [<title>](#terminal/<tab_id>) (tab del Terminale, cartella `<working folder>`)`.
+In the chip fallback replace the first line with: `🔁 **Handoff #<n> pronto.** Clicca il chip "<title>" qui sotto: apre la nuova chat e riparte da sola.`
 
 ## Manual guide (FILE mode or no tools)
 
