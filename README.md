@@ -105,6 +105,9 @@ to lose.
 too, so you can follow it from claude.ai/code or the Claude app. In the desktop app you can also turn on
 **Connect new sessions to Remote Control** in Settings.
 
+**Model and effort are inherited.** The new chat runs on the same model and effort as the old one
+(the Terminal tab gets `--model` and `--effort`), so it never starts at a lower effort by default.
+
 ## Install
 
 Requires Claude Code 2.1.271 or later, bash (on Windows, Git Bash) and Python 3.8+ (`python3`,
