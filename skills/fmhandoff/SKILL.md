@@ -2,7 +2,7 @@
 name: fmhandoff
 description: "Fazen Memory handoff. Use when the user types \"/fmhandoff\" (or \"/fmhandoff auto\"), asks to \"move to a new chat\", \"passa a una nuova chat\", \"fai l'handoff\", \"continua in una chat nuova\", or when a [fazen-memory] hook note says a red signal fired (code word missing, ~35 exchanges, context too large). It reads the whole chat in four passes, writes a complete handoff file in the project, then (AUTO mode) starts a new chat in the same folder in auto permission mode, switches to it and gives the user its link. Also use it when a message or file starts with \"# Fazen Memory handoff\" or \"Fazen Memory resume\"."
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   forked-from: "active-memory 0.2.6 (MIT, Klopyy)"
 ---
 
@@ -169,22 +169,25 @@ Do every step; verify instead of assuming. Use the session-management tools, whi
    ``Fazen Memory resume: leggi per intero `<absolute path of the handoff file>` e segui la sezione 0. Cartella di lavoro: `<absolute working folder>`.``
    Other languages: use the English one. Keep this exact wording and the backticks around the path: the Fazen Memory hook reads the path from it to re-arm the code word in the new chat.
    **Remote Control is inherited:** if `get_session("self")` shows `remoteControlState: "on"`, the new chat gets it too (each path below says how). Otherwise leave it off.
+   **Model and effort are inherited:** read `model` and `effort` from `get_session("self")` and give the new chat the same pair (each path below says how). Never leave the effort to the default: a new session can start lower than this chat.
 3. **Primary path: a session-starting tool loaded** (`hand_off_to_session`, else `start_session`). Read its schema and fill it: same working folder as this session, **no new worktree** when the schema offers that choice (uncommitted work must stay visible), title `<project> · handoff #<n>`, permission mode `auto` if the schema has it, the resume message as the prompt.
    1. If the mode was not set at start: `set_session_permission_mode(<new id>, "auto")`. The app may show the user an approval card; that is expected.
    2. `set_session_title` if the title was not set at start.
    3. Remote Control inherited: `set_remote_control(<new id>, true)`. If it is refused because the new chat has not run a turn yet, add the chip path's Remote Control sentence to the prompt instead.
-   4. `open_session_in(<new id>, "focus")`; if it is refused, try `"split"`; if that is refused too, just give the link.
-   5. **Verify** with `get_session(<new id>)`: it exists, is in the same folder, `permissionMode` is `auto` (and `remoteControlState` is `on` when inherited). Report what is not true instead of claiming it.
+   4. Model and effort: if the schema did not set them at start, `set_session_model(<new id>, <model>)` and `set_session_effort(<new id>, <effort>)` (load both with ToolSearch).
+   5. `open_session_in(<new id>, "focus")`; if it is refused, try `"split"`; if that is refused too, just give the link.
+   6. **Verify** with `get_session(<new id>)`: it exists, is in the same folder, `permissionMode` is `auto`, `model` and `effort` match this chat (and `remoteControlState` is `on` when inherited). Report what is not true instead of claiming it.
 4. **Chip path (the default in the desktop app when no session-starting tool loaded): `spawn_task` loaded.** One click on the chip's button ("Inizia worktree" in the Italian app) gives the user a real chat in the app's session list. It runs in its own git worktree, which does not see uncommitted changes, and the handoff file stays in the main folder (`.claude/handoffs/` is ignored by git).
    1. If `git status --short` shows uncommitted changes, tell the user in one line which files are uncommitted and ask whether to commit them first (committing is their call). Their answer comes before the chip. Uncommitted work is never a reason to switch to the Terminal path: a Terminal chat is not in the app's sidebar, and users lose it.
-   2. `spawn_task` with `cwd` = the working folder, `title` = `<project>: handoff #<n>` (in the user's language), `tldr` = why (chat too long, handoff #n ready), `prompt` = the resume message plus, in the user's language: `First action: switch this session to auto mode with set_session_permission_mode("self", "auto")` + (only when Remote Control is inherited) ` and turn Remote Control on with set_remote_control("self", true)` + `. This chat runs in a worktree: the handoff file is in the main folder of the repo (absolute path above). Commit on the worktree's branch and open the commits as a PR to <base branch>, or ask the user how they want them merged.`
+   2. `spawn_task` with `cwd` = the working folder, `title` = `<project>: handoff #<n>` (in the user's language), `tldr` = why (chat too long, handoff #n ready), `prompt` = the resume message plus, in the user's language: `First action: switch this session to auto mode with set_session_permission_mode("self", "auto")` + (only when Remote Control is inherited) ` and turn Remote Control on with set_remote_control("self", true)` + `. Then check get_session("self"): model must be <model> and effort <effort>; if not, tell the user in one line to pick them in the model menu (a session cannot change its own model or effort). This chat runs in a worktree: the handoff file is in the main folder of the repo (absolute path above). Commit on the worktree's branch and open the commits as a PR to <base branch>, or ask the user how they want them merged.`
    3. The user needs one click on the chip. Say so plainly; do not claim the new chat is running.
 5. **Terminal path (reserve, only when `spawn_task` did not load and `run_in_terminal` did; zero clicks, verified live 2026-10-13).** A Claude Code session in a tab of the app's Terminal panel, in the same folder, no worktree. It does **not** appear in the app's sidebar: it lives in this chat's Terminal panel, so tell the user where to find it.
    1. Read the app's own Claude Code executable with Bash: `echo "$CLAUDE_CODE_EXECPATH"` (same version as the app, so it supports the same models; the npm `claude` can be too old). If it is empty, use `claude`.
    2. `run_in_terminal` without `cwd` (the tool refuses folders outside this session) and with `command`, one line, printable ASCII only, **no backticks, no `$variables`**:
-      `Set-Location '<working folder>'; <exe path> --model <this chat's model id> --permission-mode auto '<resume message without backticks>'`
+      `Set-Location '<working folder>'; <exe path> --model <model> --effort <effort> --permission-mode auto '<resume message without backticks>'`
+      (`<model>` and `<effort>` from `get_session("self")`, e.g. `--model claude-opus-5-5 --effort high`: without `--effort` the CLI starts at its own default, lower than this chat)
       (the hook also reads the path without backticks). Title: `<project> #<n>`. Remote Control inherited: add `--remote-control '<project> #<n>'` before the resume message. The name after the flag is optional; always pass it, so the resume message stays the prompt (verified live 2026-10-13: `/rc active`, prompt read correctly).
-   3. **Verify** with `read_terminal` (wait 30-60s): the header shows the right folder, the model, `Claude Max` (or the account's plan) and `auto mode on`, and the session starts reading the handoff file. If the header shows API billing, a version error or a login prompt, stop the tab and report it instead of claiming the handoff worked.
+   3. **Verify** with `read_terminal` (wait 30-60s): the header shows the right folder, the model and effort, `Claude Max` (or the account's plan) and `auto mode on`, and the session starts reading the handoff file. If the header shows API billing, a version error or a login prompt, stop the tab and report it instead of claiming the handoff worked.
    4. In a folder the CLI never opened before, Claude Code first asks "Is this a project you created or one you trust?" with "No, exit" preselected. Never answer it for the user: tell them to open the tab and choose "Yes, I trust this folder".
    5. Edits inside `~/.claude` still ask for approval in that session even in auto mode (protected folder): say so if the next step touches it.
 6. **No path available:** use the manual guide below.
@@ -198,6 +201,7 @@ Start with the code word if one is active. Then, short, translated into the user
 ```
 🔁 **We moved to this new chat:** [<title>](#<new session id>) · <link from get_session>
 - Mode: auto <✅ verified | ⚠️ <what get_session says>>
+- Model: <model> · effort <effort> <✅ verified | ⚠️ <what get_session or the terminal header says>>
 - Handoff: `<path>` (#<n>)
 - Picks up from: <next step from section 11>
 The new chat archives this one as soon as it starts.
