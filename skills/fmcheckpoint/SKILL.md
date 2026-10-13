@@ -30,43 +30,43 @@ When running unasked, **first answer the user's current message in full**, then 
 ## Steps
 
 1. Re-read the whole conversation from the first message, with extra weight on early messages and every correction.
-2. Keep only what is needed to keep working. Copy names, numbers, files, versions and rules exactly. Never round or guess. Write "nessuno" for an empty section.
-3. When two parts disagree, the latest user statement wins; the older one goes to **Cambiato / scartato**.
+2. Keep only what is needed to keep working. Copy names, numbers, files, versions and rules exactly. Never round or guess. Write "none" (in the user's language) for an empty section.
+3. When two parts disagree, the latest user statement wins; the older one goes to **Changed / dropped**.
 4. Pick the health level honestly from the table.
-5. Write the checkpoint in the user's language, every section included. Put every user correction under **Regole da ricordare**. If a code word is active, the reply still starts with it.
+5. Write the checkpoint in the user's language (headings and closing line translated too), every section included. Put every user correction under **Rules to remember**. If a code word is active, the reply still starts with it.
 6. From here on the recap is the source of truth; if the user corrects it, fix it and follow the correction.
 7. **Red:** after the checkpoint, run the `fmhandoff` skill in AUTO mode in the same turn (unless the user said not to). Do not just suggest it.
 
 ## Format
 
 ```
-📌 **Checkpoint: <🟢 Verde | 🟡 Giallo | 🔴 Rosso>**
+📌 **Checkpoint: <🟢 Green | 🟡 Yellow | 🔴 Red>**
 
-**Obiettivo:** <1-2 lines>
+**Goal:** <1-2 lines>
 
-**Decisioni prese:**
+**Decisions made:**
 - <final choices only>
 
-**Cambiato / scartato:**
+**Changed / dropped:**
 - <old → new, or rejected idea>
 
-**Dettagli chiave:** <exact names, files, numbers, versions, formats>
+**Key details:** <exact names, files, numbers, versions, formats>
 
-**Fatto finora:** <short bullets>
+**Done so far:** <short bullets>
 
-**Aperto / prossimi passi:**
+**Open / next steps:**
 1. <in order>
 
-**Regole da ricordare:** <stated preferences, constraints, corrections>
+**Rules to remember:** <stated preferences, constraints, corrections>
 
-<⚠️ or ✅> **Salute:** <one sentence>
+<⚠️ or ✅> **Health:** <one sentence>
 ```
 
 Then the line that applies:
 
-- **Yellow:** "💡 La chat si allunga: al prossimo punto buono passo a una chat nuova (`/fmhandoff`)."
-- **Red:** "🔴 Passo ora a una chat nuova." (then hand off, step 7)
-- **Fazen Memory off in this chat:** "💡 Fazen Memory spenta: `/fazenmemory` e inizio ogni risposta con 'Si Fratello!', con checkpoint, handoff automatico e auto-continua."
+- **Yellow:** "💡 The chat is getting long: at the next good break I'll move to a new chat (`/fmhandoff`)."
+- **Red:** "🔴 Moving to a new chat now." (then hand off, step 7)
+- **Fazen Memory off in this chat:** "💡 Fazen Memory is off: `/fazenmemory` turns on the code word, checkpoints, automatic handoff and auto-continue."
 
 Keep it under about 300 words. It is a refresher, not the handoff file.
 

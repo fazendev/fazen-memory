@@ -8,5 +8,20 @@
   },
   "repository": "https://github.com/fazendev/fazen-memory",
   "license": "MIT",
-  "keywords": ["memory", "handoff", "context", "long-chats", "checkpoint"]
+  "keywords": ["memory", "handoff", "context", "long-chats", "checkpoint"],
+  "userConfig": {
+    "language": {
+      "type": "string",
+      "title": "Language",
+      "description": "Language of Fazen Memory's messages and default code word. auto = Claude Code's language setting, otherwise your system language.",
+      "options": ["auto", "english", "italian"],
+      "default": "auto"
+    },
+    "codeword": {
+      "type": "string",
+      "title": "Default code word",
+      "description": "Phrase that opens every reply when Fazen Memory is on. Empty = \"Yes Brother!\" in English, \"Si Fratello!\" in Italian.",
+      "default": ""
+    }
+  }
 }

@@ -4,13 +4,28 @@
 State lives in $CLAUDE_PLUGIN_DATA/sessions/<session_id>.json (plugin) or ~/.claude/fazen-memory/sessions/ and is never shown to Claude.
 """
 import json
+import locale
 import os
 import re
 import unicodedata
 
 # Fazen Memory is off in a chat until the user types /fazenmemory (or the chat was opened by a
 # Fazen Memory handoff). Off = the hooks only count exchanges, nothing else.
-DEFAULT_PHRASE = "Si Fratello!"
+DEFAULT_PHRASES = {"en": "Yes Brother!", "it": "Si Fratello!"}
+MESSAGES = {
+    "en": {
+        "auto_yes": u"▶️ Fazen Memory: answered yes automatically to “{0}” ({1}/{2})",
+        "miss": "🐤 Fazen Memory: the reply did not start with the code word.",
+        "handoff": "🧠 Fazen Memory: red signal, starting the automatic handoff to a new chat.",
+        "red": "🔴 Fazen Memory: this chat is long, run /fmhandoff to move to a new chat.",
+    },
+    "it": {
+        "auto_yes": u"▶️ Fazen Memory: ho risposto sì in automatico a “{0}” ({1}/{2})",
+        "miss": "🐤 Fazen Memory: la risposta non è iniziata con la code word.",
+        "handoff": "🧠 Fazen Memory: segnale rosso, parte l'handoff automatico in una nuova chat.",
+        "red": "🔴 Fazen Memory: questa chat è lunga, usa /fmhandoff per passare a una nuova chat.",
+    },
+}
 MAX_AUTO_CONTINUE = 5  # automatic "yes, continue" answers per user message
 # A missed code word means drift only in a chat that is already long; in a fresh chat (e.g. the
 # first reply after a handoff) it is a slip, and a handoff there would loop.
@@ -29,6 +44,41 @@ AUTO_HANDOFF = os.environ.get("FAZEN_MEMORY_AUTO", "1") != "0"
 def fold(text):
     """Lowercase without accents, so "Sì Fratello!" still matches "Si Fratello!"."""
     return "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c)).lower()
+
+
+def _lang_code(name):
+    """'it' for any Italian name ("italian", "Italiano", "it_IT", "Italian_Italy"), else 'en'."""
+    return "it" if fold(name or "").startswith("it") else "en"
+
+
+def language():
+    """Language of the messages shown to the user and of the default code word.
+
+    The plugin's `language` option (exported to hooks as CLAUDE_PLUGIN_OPTION_LANGUAGE) wins;
+    with "auto" or no option: Claude Code's own `language` setting, then the system language."""
+    option = os.environ.get("CLAUDE_PLUGIN_OPTION_LANGUAGE", "auto").strip()
+    if option and fold(option) != "auto":
+        return _lang_code(option)
+    config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+    try:
+        with open(os.path.join(config_dir, "settings.json"), encoding="utf-8") as f:
+            setting = json.load(f).get("language")
+        if isinstance(setting, str) and setting.strip():
+            return _lang_code(setting)
+    except (OSError, ValueError, AttributeError):
+        pass
+    # Not $LANG: Git Bash sets it to en_US even on an Italian Windows. Python already applies
+    # LANG/LC_* to this locale on Linux and macOS.
+    return _lang_code(locale.getlocale()[0])
+
+
+def default_phrase():
+    """The plugin's `codeword` option, else "Si Fratello!" / "Yes Brother!" by language."""
+    return os.environ.get("CLAUDE_PLUGIN_OPTION_CODEWORD", "").strip() or DEFAULT_PHRASES[language()]
+
+
+def message(key, *args):
+    return MESSAGES[language()][key].format(*args)
 
 
 def attended():

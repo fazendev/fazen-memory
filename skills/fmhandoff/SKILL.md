@@ -76,9 +76,9 @@ You are continuing work from a previous chat. That chat is gone for you; this fi
 2. Follow sections 3 (Style), 4 (Hard rules) and 5 (Corrections) in every reply, for the rest of this chat. They override your defaults.
 3. Use the values in section 8 exactly. Never round, re-estimate, or "correct" them.
 4. Do not suggest anything listed in section 7 (Changed / rejected) again unless the user brings it up.
-5. Code word: <Start every reply with exactly "PHRASE" | None active. If the user types /fmcodeword, start every reply with the phrase they choose (default "Si Fratello!")>.
-6. Start mode: <AUTONOMOUS: reply with at most 5 lines (goal, current state, next step), then start the next step (section 11) in the same turn without waiting | WAIT: reply with at most 5 lines (goal, current state, next step), ask the questions in section 12, end with "Pronto a continuare con <next step>?" and wait for the go>. In both modes, stop and ask before anything that is the user's decision: merge, production deploy, spending money, legal, sending anything external.
-7. Fazen Memory is on in this chat. Auto-continue: never ask permission for the obvious next step of the plan ("Posso continuare con…?", "Procedo?"); do it. Ask only for the user's decisions (merge, production, money, legal, sending anything external, deleting), a genuinely open choice, or data you cannot find.
+5. Code word: <Start every reply with exactly "PHRASE" | None active. If the user types /fmcodeword, start every reply with the phrase they choose>.
+6. Start mode: <AUTONOMOUS: reply with at most 5 lines (goal, current state, next step), then start the next step (section 11) in the same turn without waiting | WAIT: reply with at most 5 lines (goal, current state, next step), ask the questions in section 12, end with "Ready to continue with <next step>?" (in the user's language) and wait for the go>. In both modes, stop and ask before anything that is the user's decision: merge, production deploy, spending money, legal, sending anything external.
+7. Fazen Memory is on in this chat. Auto-continue: never ask permission for the obvious next step of the plan ("Shall I continue with…?", "Proceed?"); do it. Ask only for the user's decisions (merge, production, money, legal, sending anything external, deleting), a genuinely open choice, or data you cannot find.
 8. Previous chat: <ARCHIVE session `<previous session id>` once your first reply is out (the user asked for old chats to be archived after a handoff) | KEEP (this chat runs in a terminal tab of the previous one: archiving it would close this chat)>.
 
 ## 1. Mission
@@ -163,51 +163,55 @@ If this chat itself started from a Fazen Memory (or active-memory) handoff file:
 Do every step; verify instead of assuming. Use the session-management tools, which are deferred: load them first.
 
 1. **Load tools.** `ToolSearch` with `select:mcp__ccd_session_mgmt__hand_off_to_session,mcp__ccd_session_mgmt__start_session,mcp__ccd_session_mgmt__set_session_permission_mode,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__get_session,mcp__ccd_window__open_session_in,mcp__terminal__run_in_terminal,mcp__terminal__read_terminal,mcp__ccd_session__spawn_task`. Use only what comes back; never call a tool that did not load.
-2. **Resume message** (the first message of the new chat), in the chat's language:
+2. **Resume message** (the first message of the new chat), in the chat's language. English:
+   ``Fazen Memory resume: read in full `<absolute path of the handoff file>` and follow section 0. Working folder: `<absolute working folder>`.``
+   Italian:
    ``Fazen Memory resume: leggi per intero `<absolute path of the handoff file>` e segui la sezione 0. Cartella di lavoro: `<absolute working folder>`.``
-   Keep this exact wording and the backticks around the path: the Fazen Memory hook reads the path from it to re-arm the code word in the new chat.
+   Other languages: use the English one. Keep this exact wording and the backticks around the path: the Fazen Memory hook reads the path from it to re-arm the code word in the new chat.
 3. **Primary path: a session-starting tool loaded** (`hand_off_to_session`, else `start_session`). Read its schema and fill it: same working folder as this session, **no new worktree** when the schema offers that choice (uncommitted work must stay visible), title `<project> · handoff #<n>`, permission mode `auto` if the schema has it, the resume message as the prompt.
    1. If the mode was not set at start: `set_session_permission_mode(<new id>, "auto")`. The app may show the user an approval card; that is expected.
    2. `set_session_title` if the title was not set at start.
    3. `open_session_in(<new id>, "focus")`; if it is refused, try `"split"`; if that is refused too, just give the link.
    4. **Verify** with `get_session(<new id>)`: it exists, is in the same folder, `permissionMode` is `auto`. Report what is not true instead of claiming it.
-4. **Terminal path (zero clicks; verified live 2026-10-13): no session-starting tool, `run_in_terminal` loaded.** A Claude Code session in a tab of the app's Terminal panel, in the same folder, no worktree.
+4. **Chip path (the default in the desktop app when no session-starting tool loaded): `spawn_task` loaded.** One click on the chip's button ("Inizia worktree" in the Italian app) gives the user a real chat in the app's session list. It runs in its own git worktree, which does not see uncommitted changes, and the handoff file stays in the main folder (`.claude/handoffs/` is ignored by git).
+   1. If `git status --short` shows uncommitted changes, tell the user in one line which files are uncommitted and ask whether to commit them first (committing is their call). Their answer comes before the chip.
+   2. `spawn_task` with `cwd` = the working folder, `title` = `<project>: handoff #<n>` (in the user's language), `tldr` = why (chat too long, handoff #n ready), `prompt` = the resume message plus, in the user's language: `First action: switch this session to auto mode with set_session_permission_mode("self", "auto"). This chat runs in a worktree: the handoff file is in the main folder of the repo (absolute path above). Commit on the worktree's branch and open the commits as a PR to <base branch>, or ask the user how they want them merged.`
+   3. The user needs one click on the chip. Say so plainly; do not claim the new chat is running.
+5. **Terminal path (reserve: no chip tool, `run_in_terminal` loaded; zero clicks, verified live 2026-10-13).** A Claude Code session in a tab of the app's Terminal panel, in the same folder, no worktree.
    1. Read the app's own Claude Code executable with Bash: `echo "$CLAUDE_CODE_EXECPATH"` (same version as the app, so it supports the same models; the npm `claude` can be too old). If it is empty, use `claude`.
    2. `run_in_terminal` without `cwd` (the tool refuses folders outside this session) and with `command`, one line, printable ASCII only, **no backticks, no `$variables`**:
-      `Set-Location '<working folder>'; <exe path> --model <this chat's model id> --permission-mode auto 'Fazen Memory resume: leggi per intero <absolute path of the handoff file> e segui la sezione 0. Cartella di lavoro: <working folder>.'`
+      `Set-Location '<working folder>'; <exe path> --model <this chat's model id> --permission-mode auto '<resume message without backticks>'`
       (the hook also reads the path without backticks). Title: `<project> #<n>`.
    3. **Verify** with `read_terminal` (wait 30-60s): the header shows the right folder, the model, `Claude Max` (or the account's plan) and `auto mode on`, and the session starts reading the handoff file. If the header shows API billing, a version error or a login prompt, stop the tab and report it instead of claiming the handoff worked.
-   4. Edits inside `~/.claude` still ask for approval in that session even in auto mode (protected folder): say so if the next step touches it.
-5. **Fallback: `spawn_task` loaded.** The chip starts a new chat in its own worktree, which does not see uncommitted changes.
-   1. If `git status --short` shows uncommitted changes, tell the user in one line which files are uncommitted and ask whether to commit them first (committing is their call). Their answer comes before the chip.
-   2. `spawn_task` with `cwd` = the working folder, `title` = `Continua <project> (handoff #<n>)`, `tldr` = why (chat too long, handoff #n ready), `prompt` = the resume message plus: `Prima azione: passa questa sessione in modalità auto con set_session_permission_mode("self", "auto").`
-   3. The user needs one click on the chip. Say so plainly; do not claim the new chat is running.
+   4. In a folder the CLI never opened before, Claude Code first asks "Is this a project you created or one you trust?" with "No, exit" preselected. Never answer it for the user: tell them to open the tab and choose "Yes, I trust this folder".
+   5. Edits inside `~/.claude` still ask for approval in that session even in auto mode (protected folder): say so if the next step touches it.
 6. **No path available:** use the manual guide below.
 7. Do not archive this chat yourself: you cannot know when the new chat is really running (with the chip it starts only when the user clicks). Section 0 point 8 tells the new chat to archive this one: ARCHIVE with this session's id (`get_session("self")`) on the primary and chip paths; KEEP on the Terminal path (the new chat lives in a terminal tab of this chat, and archiving this chat would end it).
 8. **This chat stops working on the task.** From here on the new chat owns the folder: two chats editing the same files collide. If the user writes here again about the task, remind them in one line that the work moved (with the link) and do not edit files, unless they explicitly ask to keep working here.
 
 ## Final reply (AUTO mode)
 
-Start with the code word if one is active. Then, short, in the user's language:
+Start with the code word if one is active. Then, short, translated into the user's language:
 
 ```
-🔁 **Siamo passati a questa nuova chat:** [<title>](#<new session id>) · <link from get_session>
-- Modalità: auto <✅ verificata | ⚠️ <what get_session says>>
+🔁 **We moved to this new chat:** [<title>](#<new session id>) · <link from get_session>
+- Mode: auto <✅ verified | ⚠️ <what get_session says>>
 - Handoff: `<path>` (#<n>)
-- Riparte da: <next step from section 11>
-Questa chat la archivia la nuova appena è partita.
+- Picks up from: <next step from section 11>
+The new chat archives this one as soon as it starts.
 ```
-(Terminal path: "Questa chat resta aperta: ospita il tab della nuova.")
 
-In the Terminal path the first line is: `🔁 **Siamo passati a questa nuova chat:** [<title>](#terminal/<tab_id>) (tab del Terminale, cartella `<working folder>`)`.
-In the chip fallback replace the first line with: `🔁 **Handoff #<n> pronto.** Clicca il chip "<title>" qui sotto: apre la nuova chat e riparte da sola.`
+In the chip path replace the first line with: `🔁 **Handoff #<n> ready.** Click the "<title>" chip below: it opens the new chat, which starts on its own.`
+In the Terminal path the first line is: `🔁 **We moved to this new chat:** [<title>](#terminal/<tab_id>) (Terminal tab, folder `<working folder>`)`, and the last line: "This chat stays open: it hosts the new chat's tab."
 
 ## Manual guide (FILE mode or no tools)
 
+Translated into the user's language:
+
 ```
-✅ **Handoff pronto:** `<path>`
-1. Apri una nuova chat nella stessa cartella e scegli la modalità auto.
-2. Invia: Fazen Memory resume: leggi per intero `<path>` e segui la sezione 0.
+✅ **Handoff ready:** `<path>`
+1. Open a new chat in the same folder and pick auto mode.
+2. Send: <resume message>
 ```
 
 ## Resuming (in the new chat)
@@ -216,6 +220,6 @@ When a message starts with `Fazen Memory resume`, or a file/paste starts with `#
 
 1. Read the entire file before replying. Its section 0 applies for the rest of the chat; sections 3, 4, 5 are binding, section 8 is exact data.
 2. If section 0 names a code word, start this reply and every later one with it. The hooks re-arm it on their own from the resume message; only when the file was attached or pasted some other way, mention in one line that `/fmcodeword <phrase>` turns the automatic check back on.
-3. Follow the start mode in section 0 point 6: AUTONOMOUS → 5-line summary, then start the next step in the same turn; WAIT → 5-line summary, questions from section 12, "Pronto a continuare con <next step>?", then wait.
+3. Follow the start mode in section 0 point 6: AUTONOMOUS → 5-line summary, then start the next step in the same turn; WAIT → 5-line summary, questions from section 12, "Ready to continue with <next step>?" (in the user's language), then wait.
 4. Mention any files from section 13 that are not reachable.
-5. Section 0 point 8 says ARCHIVE: right after your first reply, load `mcp__ccd_session_mgmt__get_session` and `mcp__ccd_session_mgmt__archive_session` (ToolSearch). Archive only if `get_session("self")` works (this is a Code-tab chat, not a terminal CLI session) and the session to archive is the one named in point 8 or this chat's `parentSessionId`, and it is not running. Pass the reason "Handoff #<n>: il lavoro continua qui". One line to the user: archived, or why not. Never archive any other session.
+5. Section 0 point 8 says ARCHIVE: right after your first reply, load `mcp__ccd_session_mgmt__get_session` and `mcp__ccd_session_mgmt__archive_session` (ToolSearch). Archive only if `get_session("self")` works (this is a Code-tab chat, not a terminal CLI session) and the session to archive is the one named in point 8 or this chat's `parentSessionId`, and it is not running. Pass the reason "Handoff #<n>: the work continues here" (in the user's language). One line to the user: archived, or why not (in auto mode the permission classifier can refuse it: then say the user can archive it from the sidebar, or allow `mcp__ccd_session_mgmt__archive_session` in their permissions). Never archive any other session.
