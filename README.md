@@ -122,7 +122,7 @@ Then open a chat and type `/fazenmemory`.
 
 | Command | What it does |
 |---|---|
-| `/fazenmemory [off\|status]` | Turns Fazen Memory on in this chat, off, or shows its status |
+| `/fazenmemory [off\|status]` | Turns Fazen Memory on in this chat, off, or shows its status (with a warning if its saved state keeps getting lost) |
 | `/fmcodeword [phrase\|off]` | Changes the code word or turns it off |
 | `/fmcheckpoint` | Compact recap + health 🟢🟡🔴 |
 | `/fmhandoff [file]` | Handoff file + new chat in the same folder in auto mode (`file` = the file only) |

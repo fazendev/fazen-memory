@@ -10,6 +10,7 @@
    re-arms the code word named in the handoff file.
 4. A manual /fmhandoff marks the chat so the automatic handoff does not fire again.
 5. Counts exchanges; when on, at 20 exchanges or the yellow token mark asks for a checkpoint once.
+6. /fazenmemory status gets the hooks' real data, with a warning when they missed messages.
 Never blocks the prompt. Any error exits quietly.
 """
 import json
@@ -73,6 +74,23 @@ def resumed(prompt):
     return (True, found.group(1) if found else None)
 
 
+def status_note(st, prompt, transcript_path):
+    """What the hooks really know, plus a warning when they missed messages (their state was lost)."""
+    real, last = state.user_prompts(transcript_path)
+    if prompt.strip() not in last:
+        real += 1  # the current prompt is not in the transcript yet
+    note = ("[fazen-memory] Hooks status for /fazenmemory status: Fazen Memory {0}; code word: {1}; "
+            "messages counted by the hooks: {2} of {3}; handoff already requested: {4}; state folder: {5}."
+            ).format("on" if st.get("enabled") else "off", st.get("codeword") or "none", st["turns"], real,
+                     "yes" if st.get("handoff_requested") else "no", state.state_dir())
+    if real - st["turns"] >= 2:
+        note += (" Warning: the hooks missed {0} of {1} messages. Either Fazen Memory was installed in the "
+                 "middle of this chat, or something deletes the state folder (for example a cleanup script "
+                 "or hook). While that happens, checkpoints and the automatic handoff cannot work. Show this "
+                 "warning to the user.").format(real - st["turns"], real)
+    return note
+
+
 def main():
     data = state.read_stdin_json(sys.stdin)
     session = data.get("session_id", "unknown")
@@ -116,6 +134,8 @@ def main():
             "later one with exactly \"{0}\". Plugin language: {1}; write Fazen Memory's messages "
             "to the user in it unless they write in another language."
         ).format(st["codeword"], LANGUAGE_NAMES[state.language()]))
+    if switch == "status":
+        notes.append(status_note(st, prompt, data.get("transcript_path")))
     if st.get("enabled"):
         tokens = state.context_tokens(data.get("transcript_path"))
         nudged = st.setdefault("nudged", [])

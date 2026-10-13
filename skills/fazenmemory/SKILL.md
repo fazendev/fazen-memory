@@ -2,7 +2,7 @@
 name: fazenmemory
 description: "Fazen Memory on/off switch for this chat. Use when the user types \"/fazenmemory\", \"/fazenmemory off\" or \"/fazenmemory status\", or asks to turn Fazen Memory on or off. On = a code word at the start of every reply (default \"Yes Brother!\" in English, \"Si Fratello!\" in Italian), checkpoints, automatic handoff to a new chat in auto mode when the chat gets too long, and automatic yes to obvious continuation questions."
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Fazen Memory: switch
@@ -13,7 +13,7 @@ Fazen Memory is **off** in a new chat until the user types `/fazenmemory`. A cha
 
 - **Empty** → turn on.
 - **`off`** → turn off: code word, checkpoints, automatic handoff and auto-continue all stop.
-- **`status`** → one line per item: on/off, code word, exchanges so far (estimate), whether a handoff already happened in this chat.
+- **`status`** → one line per item, from this turn's `[fazen-memory]` status note: on/off, code word, messages counted by the hooks, whether a handoff was already requested. If the note has a warning, show it word for word as the last line. No note: say that the plugin's hooks are not running in this chat.
 
 ## Turn on
 
