@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """Stop hook (Fazen Memory). Does nothing in chats where Fazen Memory is off.
 
-- Code word missing at the start of the reply -> warn the user (systemMessage).
+- Code word missing at the start of both the turn's first text and the final reply -> warn the user
+  (systemMessage).
 - Red signal (code word missed, 35 exchanges, or the red token mark) -> once per chat, block the
   stop and tell Claude to run the fmhandoff skill in AUTO mode now: handoff file, new chat in the
   same folder in auto mode, link back to the user.
@@ -84,6 +85,10 @@ def reply_start(transcript_path, last_message):
     return last_message or None
 
 
+def opens_with(text, phrase):
+    return state.fold(LEADING_NOISE.sub("", text or "")).startswith(state.fold(phrase))
+
+
 def obvious_continuation(message):
     """The closing question when the reply ends with exactly one yes/no 'shall I continue?'
     question that is not the user's decision; otherwise None."""
@@ -143,7 +148,9 @@ def main():
     phrase = st.get("codeword")
     if phrase:
         text = reply_start(data.get("transcript_path"), last_message)
-        if text and text.strip() and not state.fold(LEADING_NOISE.sub("", text)).startswith(state.fold(phrase)):
+        # One user prompt can drive a long autonomous turn whose first text is a progress note:
+        # the code word at the start of the final reply counts too.
+        if text and text.strip() and not opens_with(text, phrase) and not opens_with(last_message, phrase):
             st["misses"] = int(st.get("misses", 0)) + 1
             warnings.append(state.message("miss"))
             if turns >= state.MISS_MIN_TURNS or tokens >= state.MISS_MIN_TOKENS:

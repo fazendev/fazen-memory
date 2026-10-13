@@ -330,6 +330,34 @@ check("prefixed /fmhandoff -> marked", state_of(s22).get("handoff_requested") is
 run("on_prompt.py", {"session_id": s22, "prompt": "/fazen-memory:fazenmemory off"})
 check("prefixed /fazenmemory off", not state_of(s22).get("enabled"), state_of(s22))
 
+# 23. one long autonomous turn (seen live in handoff chat #4): a progress note comes first, the final
+#     reply starts with the code word, big context -> not a miss
+def long_turn(first, last, tokens=335000):
+    path = os.path.join(tempfile.gettempdir(), "fm_t_%s.jsonl" % uuid.uuid4().hex)
+    rows = [{"type": "user", "message": {"content": "Fazen Memory resume: ..."}},
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": first}]}},
+            {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {}}]}},
+            {"type": "user", "message": {"content": [{"type": "tool_result", "content": "ok"}]}},
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": last}],
+                                              "usage": {"input_tokens": tokens}}}]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(json.dumps(r) for r in rows) + "\n")
+    return path
+
+s23 = new_session()
+run("on_prompt.py", {"session_id": s23, "prompt": "/fmcodeword"})
+final = "Si Fratello!  Il plugin ora è multilingua."
+out = run("on_stop.py", {"session_id": s23, "transcript_path": long_turn("Archivio la chat precedente.", final),
+                         "last_assistant_message": final})
+check("long turn: progress note first, final reply with code word -> no miss", out == {}, out)
+check("long turn: misses not counted", not state_of(s23).get("misses"), state_of(s23))
+s23 = new_session()
+run("on_prompt.py", {"session_id": s23, "prompt": "/fmcodeword"})
+out = run("on_stop.py", {"session_id": s23, "transcript_path": long_turn("Archivio la chat precedente.", "Fatto."),
+                         "last_assistant_message": "Fatto."})
+check("long turn: code word in neither -> miss + block", out.get("decision") == "block"
+      and "code word" in out.get("reason", ""), out)
+
 shutil.rmtree(DATA, ignore_errors=True)
 print("\nRESULT:", "ALL PASS" if not fails else "FAILED: %s" % fails)
 sys.exit(1 if fails else 0)
