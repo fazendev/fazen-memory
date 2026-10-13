@@ -210,6 +210,10 @@ s17 = new_session()
 run("on_prompt.py", {"session_id": s17, "prompt": "Fazen Memory resume: leggi per intero `%s`" % hfile})
 check("resume -> on + carried phrase", state_of(s17).get("enabled") and state_of(s17).get("codeword") == "Si Fratello!",
       state_of(s17))
+s17b = new_session()
+run("on_prompt.py", {"session_id": s17b, "prompt": "Fazen Memory resume: read in full `%s` and follow section 0." % hfile})
+check("English resume -> on + carried phrase",
+      state_of(s17b).get("enabled") and state_of(s17b).get("codeword") == "Si Fratello!", state_of(s17b))
 
 
 # 18. auto-continue on obvious continuation questions
@@ -223,6 +227,9 @@ s18 = new_session()
 run("on_prompt.py", {"session_id": s18, "prompt": "/fazenmemory"})
 out = stop_with(s18, "Punto 1 fatto, test verdi.\n\nPosso continuare con il punto 2?")
 check("obvious question -> auto yes", out.get("decision") == "block" and "YES" in out.get("reason", ""), out)
+for msg in ("Step 1 done, tests green.\n\nShall I proceed with step 2?", "Done. Want me to carry on with the next step?"):
+    out = stop_with(s18, msg)
+    check("English obvious question -> auto yes", out.get("decision") == "block", [msg, out])
 cases = [
     ("choice", "Procedo con A o con B?"),
     ("two questions", "Ti va bene il nome? Procedo con il punto 2?"),
@@ -230,6 +237,11 @@ cases = [
     ("gated merge", "Review ok. Posso continuare con il merge della PR?"),
     ("not a continuation", "Che colore preferisci per il bottone?"),
     ("no question", "Fatto, tutto verde."),
+    ("en choice", "Shall I proceed with A or B?"),
+    ("en gated deploy", "Build is green. Shall I proceed with the production deploy?"),
+    ("en gated delete", "Shall I proceed and remove the old branch?"),
+    ("en gated payment", "Shall I continue and buy the domain?"),
+    ("en not a continuation", "Which color do you prefer for the button?"),
 ]
 for name, msg in cases:
     check("no auto yes: " + name, "decision" not in stop_with(s18, msg), msg)
@@ -258,7 +270,7 @@ if bash:
                        input=json.dumps({"session_id": s20, "prompt": "/fazenmemory"}).encode("utf-8"),
                        capture_output=True, timeout=60)
     check("run.sh launcher -> hook ran", p.returncode == 0 and state_of(s20).get("enabled") is True,
-          (p.returncode, p.stderr[-300:]))
+          [p.returncode, p.stderr[-300:]])
 else:
     print("SKIP run.sh launcher (no bash)")
 

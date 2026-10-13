@@ -22,7 +22,8 @@ import state  # noqa: E402
 SWITCH_RE = re.compile(r"^\s*/fazenmemory\b(.*)$", re.IGNORECASE | re.DOTALL)
 CODEWORD_RE = re.compile(r"^\s*/fmcodeword\b(.*)$", re.IGNORECASE | re.DOTALL)
 HANDOFF_RE = re.compile(r"^\s*/fmhandoff\b", re.IGNORECASE)
-RESUME_RE = re.compile(r"Fazen Memory resume:\s*leggi per intero\s+`?([^`\n]+?\.md)`?", re.IGNORECASE)
+RESUME_RE = re.compile(r"Fazen Memory resume:\s*(?:read in full|leggi per intero)\s+`?([^`\n]+?\.md)`?",
+                       re.IGNORECASE)
 HANDOFF_PHRASE_RE = re.compile(r"Start every reply with exactly \"(.+?)\"")
 
 

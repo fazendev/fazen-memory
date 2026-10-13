@@ -5,7 +5,7 @@
 - Red signal (code word missed, 35 exchanges, or the red token mark) -> once per chat, block the
   stop and tell Claude to run the fmhandoff skill in AUTO mode now: handoff file, new chat in the
   same folder in auto mode, link back to the user.
-- The reply ends with one obvious continuation question ("Posso continuare con il punto 2?") ->
+- The reply ends with one obvious continuation question ("Shall I continue with step 2?") ->
   answer yes for the user (at most MAX_AUTO_CONTINUE times per user message). Never for choices,
   several questions, or anything that is the user's decision (merge, production, money, legal,
   sending, deleting).
@@ -24,14 +24,15 @@ LEADING_NOISE = re.compile(r"^[\s*_#>`~\-]+")
 CODE_BLOCK = re.compile(r"```.*?```|`[^`\n]*`", re.DOTALL)
 CONTINUE_WORDS = re.compile(
     r"continu|prosegu|proced|avanti|\bpass(o|iamo|are) (a|al|allo|alla|ai|agli|alle)\b|\bpart(o|iamo|ire)\b"
-    r"|prossim[oa] (passo|punto|step|fase)|go ahead|move on|next step")
+    r"|prossim[oa] (passo|punto|step|fase)|go ahead|move on|next step|proceed|carry on|keep going")
 CHOICE_WORDS = re.compile(r"\b(o|oppure|or|vs|versus)\b")
 # The user's decisions: never answered automatically (folded: lowercase, no accents).
 GATED_WORDS = re.compile(
     r"merge|deploy|produzion|\bprod\b|production|\bpush|pubblic|publish|rilasc|release|pagam|pagare|acquist"
     r"|\bcompr[aoi]\b|comprare|\bspes[ae]\b|\bcost[oi]\b|fattur|bonific|elimin|cancell|delet|\bdrop\b|rimuov"
     r"|\breset|force|\binvi[aoi]\b|inviare|\bsend|e-?mail|messaggi|whatsapp|slack|legal|contratt|archivi"
-    r"|migrazion|migration|password|segret|secret|api key")
+    r"|migrazion|migration|password|segret|secret|api key"
+    r"|\bpay|purchas|\bbuy|invoic|remov|contract|messag")
 
 
 def _is_real_prompt(entry):
@@ -123,7 +124,7 @@ def main():
                 "decisions (merge, production, money, legal, sending anything external, deleting) or "
                 "a genuinely open choice."
             ).format(question[:300]),
-            "systemMessage": u"▶️ Fazen Memory: risposto sì in automatico a “{0}” ({1}/{2})".format(
+            "systemMessage": u"▶️ Fazen Memory: answered yes automatically to “{0}” ({1}/{2})".format(
                 question[:120], st["auto_continues"], state.MAX_AUTO_CONTINUE),
         }
 
@@ -144,7 +145,7 @@ def main():
         text = reply_start(data.get("transcript_path"), last_message)
         if text and text.strip() and not state.fold(LEADING_NOISE.sub("", text)).startswith(state.fold(phrase)):
             st["misses"] = int(st.get("misses", 0)) + 1
-            warnings.append("🐤 Fazen Memory: la risposta non iniziava con la code word.")
+            warnings.append("🐤 Fazen Memory: the reply did not start with the code word.")
             if turns >= state.MISS_MIN_TURNS or tokens >= state.MISS_MIN_TOKENS:
                 reasons.append("the code word was missing from the last reply")
 
@@ -160,14 +161,14 @@ def main():
         out["reason"] = (
             "[fazen-memory] Red signal: {0}. Run the fmhandoff skill in AUTO mode now: write the "
             "handoff file, start the new chat in this same folder in auto permission mode, switch "
-            "to it, and tell the user 'Siamo passati a questa nuova chat' with its link. If you were "
+            "to it, and tell the user, in their language, that the work moved to the new chat, with its link. If you were "
             "waiting on the user for a decision, record it in section 12 and still hand off."
         ).format("; ".join(reasons))
-        warnings.append("🧠 Fazen Memory: segnale rosso, avvio handoff automatico in una nuova chat.")
+        warnings.append("🧠 Fazen Memory: red signal, starting the automatic handoff to a new chat.")
     else:
         if reasons and not st.get("red_warned"):
             st["red_warned"] = True
-            warnings.append("🔴 Fazen Memory: chat lunga, esegui /fmhandoff per passare a una chat nuova.")
+            warnings.append("🔴 Fazen Memory: this chat is long, run /fmhandoff to move to a new chat.")
         cont = auto_continue()
         if cont:
             out["decision"], out["reason"] = cont["decision"], cont["reason"]
