@@ -319,6 +319,17 @@ check("codeword option overrides default", state_of(s21).get("codeword") == "Agl
 del os.environ["CLAUDE_PLUGIN_OPTION_CODEWORD"]
 os.environ["CLAUDE_PLUGIN_OPTION_LANGUAGE"] = "italian"
 
+# 22. commands with the plugin prefix (/fazen-memory:<skill>)
+s22 = new_session()
+run("on_prompt.py", {"session_id": s22, "prompt": "/fazen-memory:fazenmemory"})
+check("prefixed /fazenmemory -> on", state_of(s22).get("enabled") is True, state_of(s22))
+run("on_prompt.py", {"session_id": s22, "prompt": "/fazen-memory:fmcodeword Agli ordini!"})
+check("prefixed /fmcodeword -> phrase", state_of(s22).get("codeword") == "Agli ordini!", state_of(s22))
+run("on_prompt.py", {"session_id": s22, "prompt": "/fazen-memory:fmhandoff"})
+check("prefixed /fmhandoff -> marked", state_of(s22).get("handoff_requested") is True, state_of(s22))
+run("on_prompt.py", {"session_id": s22, "prompt": "/fazen-memory:fazenmemory off"})
+check("prefixed /fazenmemory off", not state_of(s22).get("enabled"), state_of(s22))
+
 shutil.rmtree(DATA, ignore_errors=True)
 print("\nRESULT:", "ALL PASS" if not fails else "FAILED: %s" % fails)
 sys.exit(1 if fails else 0)

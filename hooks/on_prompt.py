@@ -20,9 +20,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import state  # noqa: E402
 
-SWITCH_RE = re.compile(r"^\s*/fazenmemory\b(.*)$", re.IGNORECASE | re.DOTALL)
-CODEWORD_RE = re.compile(r"^\s*/fmcodeword\b(.*)$", re.IGNORECASE | re.DOTALL)
-HANDOFF_RE = re.compile(r"^\s*/fmhandoff\b", re.IGNORECASE)
+# As a plugin the commands also run with the plugin prefix: /fazen-memory:fazenmemory.
+SWITCH_RE = re.compile(r"^\s*/(?:fazen-memory:)?fazenmemory\b(.*)$", re.IGNORECASE | re.DOTALL)
+CODEWORD_RE = re.compile(r"^\s*/(?:fazen-memory:)?fmcodeword\b(.*)$", re.IGNORECASE | re.DOTALL)
+HANDOFF_RE = re.compile(r"^\s*/(?:fazen-memory:)?fmhandoff\b", re.IGNORECASE)
 RESUME_RE = re.compile(r"Fazen Memory resume:\s*(?:read in full|leggi per intero)\s+`?([^`\n]+?\.md)`?",
                        re.IGNORECASE)
 HANDOFF_PHRASE_RE = re.compile(r"Start every reply with exactly \"(.+?)\"")
