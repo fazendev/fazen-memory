@@ -177,6 +177,9 @@ this chat's messages they counted, and the state folder.
   the chat, or something deletes the state folder. Cleanup scripts or hooks that empty
   `~/.claude/plugins/data/` wipe the state of every plugin, and Fazen Memory restarts from zero each
   time: no checkpoint, no handoff. Exclude that folder from the cleanup.
+- **"failed to load ... userConfig.language: Unrecognized key: "options"".** That `claude` is older
+  than 2.1.271 (often a separate npm install on the PATH, not the one the desktop app uses). Check
+  `claude --version` and update it.
 - **No status note at all.** The plugin's hooks are not running. Check that the plugin is enabled in
   `/plugin`, then restart Claude Code.
 - **Windows: `python3` fails** with "Failed to launch ... python.exe". The Python install manager
