@@ -75,7 +75,7 @@ sequenceDiagram
 ```mermaid
 flowchart TB
     subgraph old["Old chat"]
-        H1["Read the whole chat<br/>in four passes"] --> H2["Write .claude/handoffs/handoff-&lt;topic&gt;.md<br/>rules · corrections · decisions · exact values · next steps"]
+        H1["Read the whole chat<br/>in four passes"] --> H2["Write .claude/handoffs/handoff-topic.md<br/>rules · corrections · decisions · exact values · next steps"]
     end
     H2 --> NC["Start a new chat in the same folder<br/>in auto permission mode"]
     subgraph new["New chat"]
