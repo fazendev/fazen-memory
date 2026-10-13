@@ -2,8 +2,12 @@ import json, os, subprocess, sys, tempfile, uuid
 
 sys.stdout.reconfigure(encoding="utf-8")  # Windows console is cp1252; hook messages carry emoji
 
-HOOKS = os.path.join(os.path.expanduser("~"), ".claude", "fazen-memory", "hooks")
-STATE = os.path.join(os.path.expanduser("~"), ".claude", "fazen-memory", "sessions")
+HOOKS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "hooks")
+# Isolated state: the hooks write where an installed plugin would, in a throwaway folder.
+DATA = tempfile.mkdtemp(prefix="fm_data_")
+os.environ["CLAUDE_PLUGIN_DATA"] = DATA
+STATE = os.path.join(DATA, "sessions")
+os.makedirs(STATE)
 fails = []
 # Baseline: an attended chat (test 19 changes it).
 os.environ["CLAUDE_CODE_SESSION_ATTENDED"] = "1"
@@ -246,8 +250,18 @@ os.environ["CLAUDE_CODE_SESSION_ATTENDED"] = "1"
 
 import shutil
 shutil.rmtree(hdir, ignore_errors=True)
-for f in os.listdir(STATE):
-    if f.startswith("test-"):
-        os.remove(os.path.join(STATE, f))
+# 20. the plugin launcher finds a working Python and passes the hook its stdin
+bash = shutil.which("bash")
+if bash:
+    s20 = new_session()
+    p = subprocess.run([bash, os.path.join(HOOKS, "run.sh"), "on_prompt.py"],
+                       input=json.dumps({"session_id": s20, "prompt": "/fazenmemory"}).encode("utf-8"),
+                       capture_output=True, timeout=60)
+    check("run.sh launcher -> hook ran", p.returncode == 0 and state_of(s20).get("enabled") is True,
+          (p.returncode, p.stderr[-300:]))
+else:
+    print("SKIP run.sh launcher (no bash)")
+
+shutil.rmtree(DATA, ignore_errors=True)
 print("\nRESULT:", "ALL PASS" if not fails else "FAILED: %s" % fails)
 sys.exit(1 if fails else 0)

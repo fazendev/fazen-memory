@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Fazen Memory: per-session state shared by the hooks (fork of active-memory 0.2.6, MIT).
 
-State lives in ~/.claude/fazen-memory/sessions/<session_id>.json and is never shown to Claude.
+State lives in $CLAUDE_PLUGIN_DATA/sessions/<session_id>.json (plugin) or ~/.claude/fazen-memory/sessions/ and is never shown to Claude.
 """
 import json
 import os
@@ -42,7 +42,9 @@ def attended():
 
 
 def state_dir():
-    base = os.path.join(os.path.expanduser("~"), ".claude", "fazen-memory", "sessions")
+    # Installed as a plugin: Claude Code's per-plugin data folder (kept across updates).
+    root = os.environ.get("CLAUDE_PLUGIN_DATA") or os.path.join(os.path.expanduser("~"), ".claude", "fazen-memory")
+    base = os.path.join(root, "sessions")
     os.makedirs(base, exist_ok=True)
     return base
 

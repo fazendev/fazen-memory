@@ -1,0 +1,14 @@
+{
+  "name": "fazen-memory",
+  "description": "Fazen Memory plugin for Claude Code",
+  "owner": {
+    "name": "FazenDev"
+  },
+  "plugins": [
+    {
+      "name": "fazen-memory",
+      "source": "./",
+      "description": "Code word, checkpoints and automatic handoff to a fresh chat for long Claude Code sessions."
+    }
+  ]
+}
