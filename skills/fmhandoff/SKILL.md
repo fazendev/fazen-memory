@@ -79,6 +79,7 @@ You are continuing work from a previous chat. That chat is gone for you; this fi
 5. Code word: <Start every reply with exactly "PHRASE" | None active. If the user types /fmcodeword, start every reply with the phrase they choose (default "Si Fratello!")>.
 6. Start mode: <AUTONOMOUS: reply with at most 5 lines (goal, current state, next step), then start the next step (section 11) in the same turn without waiting | WAIT: reply with at most 5 lines (goal, current state, next step), ask the questions in section 12, end with "Pronto a continuare con <next step>?" and wait for the go>. In both modes, stop and ask before anything that is the user's decision: merge, production deploy, spending money, legal, sending anything external.
 7. Fazen Memory is on in this chat. Auto-continue: never ask permission for the obvious next step of the plan ("Posso continuare con…?", "Procedo?"); do it. Ask only for the user's decisions (merge, production, money, legal, sending anything external, deleting), a genuinely open choice, or data you cannot find.
+8. Previous chat: <ARCHIVE session `<previous session id>` once your first reply is out (the user asked for old chats to be archived after a handoff) | KEEP (this chat runs in a terminal tab of the previous one: archiving it would close this chat)>.
 
 ## 1. Mission
 - **Goal:** <what is being built or solved>
@@ -182,7 +183,7 @@ Do every step; verify instead of assuming. Use the session-management tools, whi
    2. `spawn_task` with `cwd` = the working folder, `title` = `Continua <project> (handoff #<n>)`, `tldr` = why (chat too long, handoff #n ready), `prompt` = the resume message plus: `Prima azione: passa questa sessione in modalità auto con set_session_permission_mode("self", "auto").`
    3. The user needs one click on the chip. Say so plainly; do not claim the new chat is running.
 6. **No path available:** use the manual guide below.
-7. Do not archive this chat. It stays as it is; offer archiving in one line, only do it if the user says yes.
+7. Do not archive this chat yourself: you cannot know when the new chat is really running (with the chip it starts only when the user clicks). Section 0 point 8 tells the new chat to archive this one: ARCHIVE with this session's id (`get_session("self")`) on the primary and chip paths; KEEP on the Terminal path (the new chat lives in a terminal tab of this chat, and archiving this chat would end it).
 8. **This chat stops working on the task.** From here on the new chat owns the folder: two chats editing the same files collide. If the user writes here again about the task, remind them in one line that the work moved (with the link) and do not edit files, unless they explicitly ask to keep working here.
 
 ## Final reply (AUTO mode)
@@ -194,8 +195,9 @@ Start with the code word if one is active. Then, short, in the user's language:
 - Modalità: auto <✅ verificata | ⚠️ <what get_session says>>
 - Handoff: `<path>` (#<n>)
 - Riparte da: <next step from section 11>
-Questa chat resta aperta; se vuoi la archivio.
+Questa chat la archivia la nuova appena è partita.
 ```
+(Terminal path: "Questa chat resta aperta: ospita il tab della nuova.")
 
 In the Terminal path the first line is: `🔁 **Siamo passati a questa nuova chat:** [<title>](#terminal/<tab_id>) (tab del Terminale, cartella `<working folder>`)`.
 In the chip fallback replace the first line with: `🔁 **Handoff #<n> pronto.** Clicca il chip "<title>" qui sotto: apre la nuova chat e riparte da sola.`
@@ -216,3 +218,4 @@ When a message starts with `Fazen Memory resume`, or a file/paste starts with `#
 2. If section 0 names a code word, start this reply and every later one with it. The hooks re-arm it on their own from the resume message; only when the file was attached or pasted some other way, mention in one line that `/fmcodeword <phrase>` turns the automatic check back on.
 3. Follow the start mode in section 0 point 6: AUTONOMOUS → 5-line summary, then start the next step in the same turn; WAIT → 5-line summary, questions from section 12, "Pronto a continuare con <next step>?", then wait.
 4. Mention any files from section 13 that are not reachable.
+5. Section 0 point 8 says ARCHIVE: right after your first reply, load `mcp__ccd_session_mgmt__get_session` and `mcp__ccd_session_mgmt__archive_session` (ToolSearch). Archive only if `get_session("self")` works (this is a Code-tab chat, not a terminal CLI session) and the session to archive is the one named in point 8 or this chat's `parentSessionId`, and it is not running. Pass the reason "Handoff #<n>: il lavoro continua qui". One line to the user: archived, or why not. Never archive any other session.
