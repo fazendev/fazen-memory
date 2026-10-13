@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """UserPromptSubmit hook (Fazen Memory).
 
-1. /fazenmemory [off|status] turns Fazen Memory on or off for this chat (on = code word
-   "Si Fratello!", checkpoints, automatic handoff, automatic "yes" to obvious continuations).
-2. /fmcodeword sets or clears the phrase (never echoed back to Claude); setting one also turns
-   Fazen Memory on.
+1. /fazenmemory [off|status] turns Fazen Memory on or off for this chat (on = code word, by
+   default "Yes Brother!" in English or "Si Fratello!" in Italian, checkpoints, automatic
+   handoff, automatic "yes" to obvious continuations).
+2. /fmcodeword sets or clears the phrase; setting one also turns Fazen Memory on. Claude is told
+   the phrase only in the turn that sets it.
 3. A "Fazen Memory resume" message (first message of a chat opened by a handoff) turns it on and
    re-arms the code word named in the handoff file.
 4. A manual /fmhandoff marks the chat so the automatic handoff does not fire again.
@@ -19,12 +20,14 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import state  # noqa: E402
 
-SWITCH_RE = re.compile(r"^\s*/fazenmemory\b(.*)$", re.IGNORECASE | re.DOTALL)
-CODEWORD_RE = re.compile(r"^\s*/fmcodeword\b(.*)$", re.IGNORECASE | re.DOTALL)
-HANDOFF_RE = re.compile(r"^\s*/fmhandoff\b", re.IGNORECASE)
+# As a plugin the commands also run with the plugin prefix: /fazen-memory:fazenmemory.
+SWITCH_RE = re.compile(r"^\s*/(?:fazen-memory:)?fazenmemory\b(.*)$", re.IGNORECASE | re.DOTALL)
+CODEWORD_RE = re.compile(r"^\s*/(?:fazen-memory:)?fmcodeword\b(.*)$", re.IGNORECASE | re.DOTALL)
+HANDOFF_RE = re.compile(r"^\s*/(?:fazen-memory:)?fmhandoff\b", re.IGNORECASE)
 RESUME_RE = re.compile(r"Fazen Memory resume:\s*(?:read in full|leggi per intero)\s+`?([^`\n]+?\.md)`?",
                        re.IGNORECASE)
 HANDOFF_PHRASE_RE = re.compile(r"Start every reply with exactly \"(.+?)\"")
+LANGUAGE_NAMES = {"en": "English", "it": "Italian"}
 
 
 def _arg(m):
@@ -41,7 +44,7 @@ def parse_codeword(prompt):
         return None
     arg = _arg(m)
     if not arg:
-        return ("on", state.DEFAULT_PHRASE)
+        return ("on", state.default_phrase())
     if arg.lower() in ("off", "status"):
         return (arg.lower(), None)
     return ("on", arg)
@@ -82,7 +85,7 @@ def main():
         st["enabled"] = True
         st["misses"] = 0
         if not st.get("codeword"):
-            st["codeword"] = state.DEFAULT_PHRASE
+            st["codeword"] = state.default_phrase()
     elif switch == "off":
         st["enabled"] = False
         st["codeword"] = None
@@ -105,23 +108,30 @@ def main():
         st["handoff_requested"] = True
 
     st["turns"] = int(st.get("turns", 0)) + 1
-    note = None
+    notes = []
+    if switch == "on" or (cmd and cmd[0] == "on"):
+        # Only in the turn that sets it: the code word stays a memory test in later turns.
+        notes.append((
+            "[fazen-memory] Fazen Memory is on in this chat. Code word: start this reply and every "
+            "later one with exactly \"{0}\". Plugin language: {1}; write Fazen Memory's messages "
+            "to the user in it unless they write in another language."
+        ).format(st["codeword"], LANGUAGE_NAMES[state.language()]))
     if st.get("enabled"):
         tokens = state.context_tokens(data.get("transcript_path"))
         nudged = st.setdefault("nudged", [])
         if "yellow" not in nudged and (st["turns"] >= state.YELLOW_TURNS or tokens >= state.YELLOW_TOKENS):
             nudged.append("yellow")
-            note = (
+            notes.append((
                 "[fazen-memory] This chat is getting long ({0} exchanges, ~{1}k context tokens). "
                 "First reply to the user's message exactly as you normally would, following every rule "
                 "of this chat. Then, at the end of that same reply, append a checkpoint (fmcheckpoint "
                 "skill) with health at least yellow. Do not replace the answer with it."
-            ).format(st["turns"], tokens // 1000)
+            ).format(st["turns"], tokens // 1000))
     state.save(session, st)
 
-    if note:
+    if notes:
         print(json.dumps({
-            "hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": note}
+            "hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "\n".join(notes)}
         }))
 
 

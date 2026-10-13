@@ -124,8 +124,8 @@ def main():
                 "decisions (merge, production, money, legal, sending anything external, deleting) or "
                 "a genuinely open choice."
             ).format(question[:300]),
-            "systemMessage": u"▶️ Fazen Memory: answered yes automatically to “{0}” ({1}/{2})".format(
-                question[:120], st["auto_continues"], state.MAX_AUTO_CONTINUE),
+            "systemMessage": state.message("auto_yes", question[:120], st["auto_continues"],
+                                           state.MAX_AUTO_CONTINUE),
         }
 
     if data.get("stop_hook_active"):  # continuing after a block: only the capped auto-continue chains
@@ -145,7 +145,7 @@ def main():
         text = reply_start(data.get("transcript_path"), last_message)
         if text and text.strip() and not state.fold(LEADING_NOISE.sub("", text)).startswith(state.fold(phrase)):
             st["misses"] = int(st.get("misses", 0)) + 1
-            warnings.append("🐤 Fazen Memory: the reply did not start with the code word.")
+            warnings.append(state.message("miss"))
             if turns >= state.MISS_MIN_TURNS or tokens >= state.MISS_MIN_TOKENS:
                 reasons.append("the code word was missing from the last reply")
 
@@ -164,11 +164,11 @@ def main():
             "to it, and tell the user, in their language, that the work moved to the new chat, with its link. If you were "
             "waiting on the user for a decision, record it in section 12 and still hand off."
         ).format("; ".join(reasons))
-        warnings.append("🧠 Fazen Memory: red signal, starting the automatic handoff to a new chat.")
+        warnings.append(state.message("handoff"))
     else:
         if reasons and not st.get("red_warned"):
             st["red_warned"] = True
-            warnings.append("🔴 Fazen Memory: this chat is long, run /fmhandoff to move to a new chat.")
+            warnings.append(state.message("red"))
         cont = auto_continue()
         if cont:
             out["decision"], out["reason"] = cont["decision"], cont["reason"]

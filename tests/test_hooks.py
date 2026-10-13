@@ -9,8 +9,9 @@ os.environ["CLAUDE_PLUGIN_DATA"] = DATA
 STATE = os.path.join(DATA, "sessions")
 os.makedirs(STATE)
 fails = []
-# Baseline: an attended chat (test 19 changes it).
+# Baseline: an attended chat (test 19 changes it), plugin language Italian (test 21 changes it).
 os.environ["CLAUDE_CODE_SESSION_ATTENDED"] = "1"
+os.environ["CLAUDE_PLUGIN_OPTION_LANGUAGE"] = "italian"
 
 
 def run(script, payload):
@@ -273,6 +274,61 @@ if bash:
           [p.returncode, p.stderr[-300:]])
 else:
     print("SKIP run.sh launcher (no bash)")
+
+# 21. language: plugin option, Claude Code's `language` setting, custom default code word
+def turn_on(sid):
+    return run("on_prompt.py", {"session_id": sid, "prompt": "/fazenmemory"})
+
+
+s21 = new_session()
+out = turn_on(s21)
+ctx = out.get("hookSpecificOutput", {}).get("additionalContext", "")
+check("turn-on note names phrase + language", '"Si Fratello!"' in ctx and "Italian" in ctx, ctx)
+out = run("on_stop.py", {"session_id": s21, "last_assistant_message": "Ok fatto."})
+check("Italian miss warning", "non è iniziata" in out.get("systemMessage", ""), out)
+out = run("on_prompt.py", {"session_id": s21, "prompt": "ciao"})
+check("no phrase note in later turns", "Si Fratello" not in json.dumps(out), out)
+
+os.environ["CLAUDE_PLUGIN_OPTION_LANGUAGE"] = "english"
+s21 = new_session()
+turn_on(s21)
+check("english -> Yes Brother!", state_of(s21).get("codeword") == "Yes Brother!", state_of(s21))
+out = run("on_stop.py", {"session_id": s21, "last_assistant_message": "Done."})
+check("English miss warning", "did not start" in out.get("systemMessage", ""), out)
+s21 = new_session()
+run("on_prompt.py", {"session_id": s21, "prompt": "/fmcodeword"})
+check("/fmcodeword default follows language", state_of(s21).get("codeword") == "Yes Brother!", state_of(s21))
+
+os.environ["CLAUDE_PLUGIN_OPTION_LANGUAGE"] = "auto"
+cfg = tempfile.mkdtemp(prefix="fm_cfg_")
+os.environ["CLAUDE_CONFIG_DIR"] = cfg
+for setting, phrase in (("Italiano", "Si Fratello!"), ("japanese", "Yes Brother!")):
+    with open(os.path.join(cfg, "settings.json"), "w", encoding="utf-8") as f:
+        json.dump({"language": setting}, f)
+    s21 = new_session()
+    turn_on(s21)
+    check("auto + settings language %s -> %s" % (setting, phrase), state_of(s21).get("codeword") == phrase,
+          state_of(s21))
+del os.environ["CLAUDE_CONFIG_DIR"]
+shutil.rmtree(cfg, ignore_errors=True)
+
+os.environ["CLAUDE_PLUGIN_OPTION_CODEWORD"] = "Agli ordini!"
+s21 = new_session()
+turn_on(s21)
+check("codeword option overrides default", state_of(s21).get("codeword") == "Agli ordini!", state_of(s21))
+del os.environ["CLAUDE_PLUGIN_OPTION_CODEWORD"]
+os.environ["CLAUDE_PLUGIN_OPTION_LANGUAGE"] = "italian"
+
+# 22. commands with the plugin prefix (/fazen-memory:<skill>)
+s22 = new_session()
+run("on_prompt.py", {"session_id": s22, "prompt": "/fazen-memory:fazenmemory"})
+check("prefixed /fazenmemory -> on", state_of(s22).get("enabled") is True, state_of(s22))
+run("on_prompt.py", {"session_id": s22, "prompt": "/fazen-memory:fmcodeword Agli ordini!"})
+check("prefixed /fmcodeword -> phrase", state_of(s22).get("codeword") == "Agli ordini!", state_of(s22))
+run("on_prompt.py", {"session_id": s22, "prompt": "/fazen-memory:fmhandoff"})
+check("prefixed /fmhandoff -> marked", state_of(s22).get("handoff_requested") is True, state_of(s22))
+run("on_prompt.py", {"session_id": s22, "prompt": "/fazen-memory:fazenmemory off"})
+check("prefixed /fazenmemory off", not state_of(s22).get("enabled"), state_of(s22))
 
 shutil.rmtree(DATA, ignore_errors=True)
 print("\nRESULT:", "ALL PASS" if not fails else "FAILED: %s" % fails)
