@@ -77,7 +77,7 @@ flowchart TB
     subgraph old["Old chat"]
         H1["Read the whole chat<br/>in four passes"] --> H2["Write .claude/handoffs/handoff-topic.md<br/>rules · corrections · decisions · exact values · next steps"]
     end
-    H2 --> NC["Start a new chat in the same folder<br/>in auto permission mode"]
+    H2 --> NC["Start a new chat in the same folder<br/>in auto permission mode<br/>Remote Control inherited"]
     subgraph new["New chat"]
         NC --> R1["Read the handoff file in full"]
         R1 --> R2["Code word and rules active again"]
@@ -88,6 +88,24 @@ flowchart TB
 The handoff file has 14 fixed sections (0 to 13): instructions for the new chat, mission, the user's style,
 hard rules word for word, corrections, decisions, rejected ideas, exact data, names, work state, next
 steps, open questions and files to re-attach. Secrets are removed before it is written.
+
+### How the new chat opens
+
+Fazen Memory uses the first way your Claude Code offers:
+
+| Way | What you do | Where the new chat is |
+|---|---|---|
+| Session tools | nothing | the app's sidebar |
+| Chip | one click on the chip ("Inizia worktree" in the Italian app) | the app's sidebar, in its own git worktree |
+| Terminal tab (fallback) | nothing, or confirm "trust this folder" the first time | the Terminal panel of the old chat, **not** the sidebar |
+
+A worktree does not see uncommitted changes, so before the chip Fazen Memory asks whether to commit
+them. It does not switch to a Terminal tab to avoid the worktree: a chat outside the sidebar is easy
+to lose.
+
+**Remote Control is inherited.** If the old chat is connected to Remote Control, the new one connects
+too, so you can follow it from claude.ai/code or the Claude app. In the desktop app you can also turn on
+**Connect new sessions to Remote Control** in Settings.
 
 ## Install
 
@@ -149,6 +167,23 @@ Everything stays on your machine. Per-chat state (on/off, exchange count, code w
 plugin's data folder (`~/.claude/plugins/data/`). Handoff files go to
 `<project>/.claude/handoffs/`, and Fazen Memory adds that folder to `.gitignore` so they are not
 committed.
+
+## Troubleshooting
+
+Type `/fazenmemory status`. It shows what the hooks really recorded: on/off, code word, how many of
+this chat's messages they counted, and the state folder.
+
+- **"Warning: the hooks missed N of M messages".** Either the plugin was installed in the middle of
+  the chat, or something deletes the state folder. Cleanup scripts or hooks that empty
+  `~/.claude/plugins/data/` wipe the state of every plugin, and Fazen Memory restarts from zero each
+  time: no checkpoint, no handoff. Exclude that folder from the cleanup.
+- **No status note at all.** The plugin's hooks are not running. Check that the plugin is enabled in
+  `/plugin`, then restart Claude Code.
+- **Windows: `python3` fails** with "Failed to launch ... python.exe". The Python install manager
+  points to a removed version. Fazen Memory's `run.sh` skips broken entries and uses the first Python
+  that starts. Other plugins may not: in `%AppData%\Python\pymanager.json` set `default_tag` to an
+  installed version, plus a `shebang_templates` entry for `/usr/bin/env python3` (scripts with that
+  shebang ignore `default_tag`).
 
 ## Project layout
 
