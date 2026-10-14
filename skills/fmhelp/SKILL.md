@@ -23,9 +23,10 @@ Show the guide in the user's language: the Italian version if they write in Ital
 | `/fmhelp` | This guide |
 
 **While it is on**
-- Every reply starts with **Yes Brother!**: when it is missing, the chat is losing track
-- 🟡 20 exchanges or ~300k tokens → checkpoint at the end of the reply
-- 🔴 35 exchanges, ~450k tokens or a missing code word → automatic handoff to a new chat in auto mode, with its link (once per chat)
+- Every reply starts with **Yes Brother!**: when it is missing, the chat may be losing track (in a long chat: a reminder the first time, a handoff the second)
+- Tokens count the conversation only, not the fixed part of the chat (tools, skills, MCP)
+- 🟡 20 exchanges or ~450k tokens → checkpoint at the end of the reply
+- 🔴 35 exchanges, ~700k tokens or the code word missing twice → automatic handoff to a new chat in auto mode, with its link (once per chat)
 - ▶️ Auto-continue: no more "shall I continue with step 2?"; if one slips out, it is answered yes automatically (max 5 per message). Never for merge, production, money, legal, sending, deleting or A/B choices
 
 Chats opened by a handoff start already on. Without a person in the chat (`claude -p`, scheduled tasks): warnings only.
@@ -50,9 +51,10 @@ Then one line for this chat: Fazen Memory off → "💡 Off in this chat: `/faze
 | `/fmhelp` | Questa guida |
 
 **Quando è accesa**
-- Ogni risposta inizia con **Si Fratello!**: se manca, la chat sta perdendo il filo
-- 🟡 20 scambi o ~300k token → checkpoint in coda alla risposta
-- 🔴 35 scambi, ~450k token o code word mancante → handoff automatico in una nuova chat in auto, con link (una volta per chat)
+- Ogni risposta inizia con **Si Fratello!**: se manca, la chat può perdere il filo (in una chat lunga: un promemoria la prima volta, l'handoff la seconda)
+- I token contano solo la conversazione, non la parte fissa della chat (tool, skill, MCP)
+- 🟡 20 scambi o ~450k token → checkpoint in coda alla risposta
+- 🔴 35 scambi, ~700k token o code word mancante due volte → handoff automatico in una nuova chat in auto, con link (una volta per chat)
 - ▶️ Auto-continua: niente "posso continuare col punto 2?"; se scappa, il sì arriva in automatico (max 5 per messaggio). Mai su merge, produzione, soldi, legale, invii, cancellazioni o scelte A/B
 
 Le chat nate da un handoff partono già accese. Senza persona (`claude -p`, task programmati): solo avvisi.
