@@ -33,10 +33,11 @@ MISS_MIN_TURNS = 10
 MISS_MIN_TOKENS = 200000
 YELLOW_TURNS = 20
 RED_TURNS = 35
-# Context size (tokens) read from the transcript. The window is 1M but ~110k is fixed
-# overhead (tools, skills, MCP), and quality drops long before the window fills.
-YELLOW_TOKENS = int(os.environ.get("FAZEN_MEMORY_YELLOW_TOKENS", "300000"))
-RED_TOKENS = int(os.environ.get("FAZEN_MEMORY_RED_TOKENS", "450000"))
+# Tokens of conversation (see conversation_tokens): the fixed overhead (system prompt, tools,
+# skills, MCP; ~116k seen live) is not conversation and does not count. Red stays well under
+# Claude Code's own auto-compact (97% of a 1M window), leaving room to write the handoff.
+YELLOW_TOKENS = int(os.environ.get("FAZEN_MEMORY_YELLOW_TOKENS", "450000"))
+RED_TOKENS = int(os.environ.get("FAZEN_MEMORY_RED_TOKENS", "700000"))
 # FAZEN_MEMORY_AUTO=0 keeps the warnings but never forces the automatic handoff.
 AUTO_HANDOFF = os.environ.get("FAZEN_MEMORY_AUTO", "1") != "0"
 
@@ -189,14 +190,44 @@ def user_prompts(transcript_path):
     return (count, last)
 
 
+def _call_tokens(entry):
+    """Context size of one main-chat assistant call (input + cache creation + cache read), else None."""
+    if entry.get("type") != "assistant" or entry.get("isSidechain"):
+        return None
+    usage = (entry.get("message") or {}).get("usage")
+    if not usage:
+        return None
+    return int(usage.get("input_tokens", 0)) + int(usage.get("cache_creation_input_tokens", 0)) + int(
+        usage.get("cache_read_input_tokens", 0))
+
+
 def context_tokens(transcript_path):
-    """Context size of the latest assistant call: input + cache creation + cache read."""
+    """Context size of the latest assistant call."""
     for entry in reversed(tail_entries(transcript_path)):
-        if entry.get("type") != "assistant" or entry.get("isSidechain"):
-            continue
-        if not (entry.get("message") or {}).get("usage"):
-            continue
-        usage = (entry.get("message") or {}).get("usage") or {}
-        return int(usage.get("input_tokens", 0)) + int(usage.get("cache_creation_input_tokens", 0)) + int(
-            usage.get("cache_read_input_tokens", 0))
+        n = _call_tokens(entry)
+        if n is not None:
+            return n
     return 0
+
+
+def base_tokens(transcript_path):
+    """Context size of the chat's first assistant call: the fixed overhead plus the first prompt."""
+    try:
+        with open(transcript_path, "rb") as f:
+            for line in f:
+                if b'"usage"' not in line:  # cheap filter: most lines carry no usage
+                    continue
+                try:
+                    n = _call_tokens(json.loads(line.decode("utf-8")))
+                except (ValueError, UnicodeDecodeError):
+                    continue
+                if n is not None:
+                    return n
+    except (OSError, TypeError):
+        pass
+    return 0
+
+
+def conversation_tokens(transcript_path):
+    """Tokens the conversation itself adds to the context, without the fixed overhead."""
+    return max(0, context_tokens(transcript_path) - base_tokens(transcript_path))

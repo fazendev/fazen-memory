@@ -2,8 +2,9 @@
 """Stop hook (Fazen Memory). Does nothing in chats where Fazen Memory is off.
 
 - Code word missing at the start of both the turn's first text and the final reply -> warn the user
-  (systemMessage).
-- Red signal (code word missed, 35 exchanges, or the red token mark) -> once per chat, block the
+  (systemMessage). In a long chat the first such miss also reminds Claude on the next prompt.
+- Red signal (code word missed a second time in a long chat, 35 exchanges, or the red mark of
+  conversation tokens) -> once per chat, block the
   stop and tell Claude to run the fmhandoff skill in AUTO mode now: handoff file, new chat in the
   same folder in auto mode, link back to the user.
 - The reply ends with one obvious continuation question ("Shall I continue with step 2?") ->
@@ -144,7 +145,7 @@ def main():
     warnings = []
 
     turns = int(st.get("turns", 0))
-    tokens = state.context_tokens(data.get("transcript_path"))
+    tokens = state.conversation_tokens(data.get("transcript_path"))
     phrase = st.get("codeword")
     if phrase:
         text = reply_start(data.get("transcript_path"), last_message)
@@ -154,12 +155,17 @@ def main():
             st["misses"] = int(st.get("misses", 0)) + 1
             warnings.append(state.message("miss"))
             if turns >= state.MISS_MIN_TURNS or tokens >= state.MISS_MIN_TOKENS:
-                reasons.append("the code word was missing from the last reply")
+                # One slip is not drift: the first one gets a reminder, the second one hands off.
+                st["late_misses"] = int(st.get("late_misses", 0)) + 1
+                if st["late_misses"] >= 2:
+                    reasons.append("the code word was missing again")
+                else:
+                    st["remind"] = True
 
     if turns >= state.RED_TURNS:
         reasons.append("the chat reached {0} exchanges".format(turns))
     if tokens >= state.RED_TOKENS:
-        reasons.append("the context reached ~{0}k tokens".format(tokens // 1000))
+        reasons.append("the conversation reached ~{0}k tokens".format(tokens // 1000))
 
     out = {}
     if reasons and state.AUTO_HANDOFF and state.attended() and not st.get("handoff_requested"):

@@ -22,13 +22,21 @@ def run(script, payload):
     return json.loads(out) if out else {}
 
 
-def transcript(reply, tokens=1000):
+BASE = 120000  # fixed overhead of a real chat (system prompt, tools, skills, MCP): seen ~116k live
+
+
+def transcript(reply, tokens=1000, base=BASE):
+    """A chat whose first call costs `base` (the fixed overhead) and whose latest call carries
+    `tokens` of conversation on top of it."""
     path = os.path.join(tempfile.gettempdir(), "fm_t_%s.jsonl" % uuid.uuid4().hex)
     rows = [
+        {"type": "user", "message": {"role": "user", "content": "inizio"}},
+        {"type": "assistant", "message": {"content": [{"type": "text", "text": "ok"}],
+                                          "usage": {"input_tokens": base}}},
         {"type": "user", "message": {"role": "user", "content": "ciao"}},
         {"type": "assistant", "message": {"content": [{"type": "text", "text": reply}],
                                           "usage": {"input_tokens": 1, "cache_creation_input_tokens": 0,
-                                                    "cache_read_input_tokens": tokens - 1}}},
+                                                    "cache_read_input_tokens": base + tokens - 1}}},
     ]
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(json.dumps(r) for r in rows) + "\n")
@@ -65,37 +73,55 @@ t2 = transcript("Ecco il codice")
 out = run("on_stop.py", {"session_id": s, "transcript_path": t2, "last_assistant_message": "Ecco il codice"})
 check("fresh chat miss -> warn, no block", "decision" not in out and "code word" in out.get("systemMessage", ""), out)
 
-# 2b. miss in a long chat (>= 10 exchanges) -> block + systemMessage, phrase never leaked to Claude
+# 2b. first miss in a long chat (>= 10 exchanges) -> warning only: one slip is not drift
 for _ in range(9):
     run("on_prompt.py", {"session_id": s, "prompt": "vai", "transcript_path": t2})
 out = run("on_stop.py", {"session_id": s, "transcript_path": t2, "last_assistant_message": "Ecco il codice"})
-check("codeword missing -> block", out.get("decision") == "block", out)
+check("first long-chat miss -> warn, no block", "decision" not in out and "code word" in out.get("systemMessage", ""), out)
+
+# 2c. the next prompt reminds Claude of the rules, without ever sending the phrase
+out = run("on_prompt.py", {"session_id": s, "prompt": "vai", "transcript_path": t2})
+ctx = out.get("hookSpecificOutput", {}).get("additionalContext", "")
+check("miss -> reminder on next prompt", "code word" in ctx, out)
+check("reminder does not leak phrase", "Fratello" not in ctx, out)
+out = run("on_prompt.py", {"session_id": s, "prompt": "vai", "transcript_path": t2})
+check("reminder only once", "code word" not in out.get("hookSpecificOutput", {}).get("additionalContext", ""), out)
+
+# 2d. second miss in the long chat -> block + systemMessage, phrase never leaked to Claude
+out = run("on_stop.py", {"session_id": s, "transcript_path": t2, "last_assistant_message": "Ecco il codice"})
+check("codeword missing again -> block", out.get("decision") == "block", out)
 check("reason does not leak phrase", "Fratello" not in out.get("reason", ""), out)
 check("systemMessage shown", "code word" in out.get("systemMessage", ""), out)
 
-# 3. second miss -> no second block (once per chat), warning only
+# 3. third miss -> no second block (once per chat), warning only
 out = run("on_stop.py", {"session_id": s, "transcript_path": t2, "last_assistant_message": "Ecco il codice"})
-check("second miss -> no re-block", "decision" not in out and "systemMessage" in out, out)
+check("third miss -> no re-block", "decision" not in out and "systemMessage" in out, out)
 
 # 4. stop_hook_active -> nothing (anti-loop)
 out = run("on_stop.py", {"session_id": new_session(), "stop_hook_active": True, "transcript_path": t2})
 check("stop_hook_active -> silent", out == {}, out)
 
-# 5. red tokens without codeword -> block
+# 5. red tokens (conversation, overhead excluded) without codeword -> block
 s5 = on_session()
-t5 = transcript("risposta", tokens=460000)
+t5 = transcript("risposta", tokens=720000)
 out = run("on_stop.py", {"session_id": s5, "transcript_path": t5, "last_assistant_message": "risposta"})
-check("red tokens -> block", out.get("decision") == "block" and "460k" in out.get("reason", ""), out)
+check("red tokens -> block", out.get("decision") == "block" and "720k" in out.get("reason", ""), out)
 
 # 6. below red tokens -> silent
-s6 = new_session()
-out = run("on_stop.py", {"session_id": s6, "transcript_path": transcript("x", tokens=200000),
+s6 = on_session()
+out = run("on_stop.py", {"session_id": s6, "transcript_path": transcript("x", tokens=690000),
                           "last_assistant_message": "x"})
 check("below red -> silent", out == {}, out)
 
+# 6b. the fixed overhead does not count: 750k in the window, of which 300k fixed -> 450k of
+#     conversation, under red (the old total-context measure handed off here)
+out = run("on_stop.py", {"session_id": on_session(), "transcript_path": transcript("x", tokens=450000, base=300000),
+                          "last_assistant_message": "x"})
+check("fixed overhead excluded -> no red", out == {}, out)
+
 # 7. yellow tokens on prompt -> checkpoint note once
 s7 = on_session()
-t7 = transcript("x", tokens=310000)
+t7 = transcript("x", tokens=460000)
 out = run("on_prompt.py", {"session_id": s7, "prompt": "vai", "transcript_path": t7})
 ctx = out.get("hookSpecificOutput", {}).get("additionalContext", "")
 check("yellow tokens -> checkpoint note", "fmcheckpoint" in ctx, out)
@@ -112,7 +138,7 @@ check("35 turns -> block", out.get("decision") == "block" and "35 exchanges" in 
 
 # 9. manual /fmhandoff earlier -> red does not re-block, single warning
 s9 = on_session()
-t9 = transcript("x", tokens=500000)
+t9 = transcript("x", tokens=720000)
 run("on_prompt.py", {"session_id": s9, "prompt": "/fmhandoff", "transcript_path": t9})
 out = run("on_stop.py", {"session_id": s9, "transcript_path": t9, "last_assistant_message": "x"})
 check("after manual handoff -> no block, warn", "decision" not in out and "fmhandoff" in out.get("systemMessage", ""), out)
@@ -152,19 +178,22 @@ check("resume with no code word -> stays off", not st12b.get("codeword"), st12b)
 big = os.path.join(tempfile.gettempdir(), "fm_big.jsonl")
 filler = json.dumps({"type": "user", "message": {"content": [{"type": "tool_result", "content": "x" * 5000}]}})
 with open(big, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "inizio"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": "ok"}],
+                        "usage": {"input_tokens": BASE}}}) + "\n")
     for _ in range(4000):  # ~20 MB of old history
         f.write(filler + "\n")
     f.write(json.dumps({"type": "user", "message": {"content": "vai"}}) + "\n")
     f.write(json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": "Ecco"}],
-                        "usage": {"input_tokens": 470000}}}) + "\n")
+                        "usage": {"input_tokens": BASE + 720000}}}) + "\n")
 s13 = new_session()
 run("on_prompt.py", {"session_id": s13, "prompt": "/fmcodeword", "transcript_path": big})
 import time as _t
 t0 = _t.time()
 out = run("on_stop.py", {"session_id": s13, "transcript_path": big, "last_assistant_message": "Ecco"})
 dt = _t.time() - t0
-check("big transcript: miss + red detected", out.get("decision") == "block" and "470k" in out.get("reason", "")
-      and "code word" in out.get("reason", ""), out)
+check("big transcript: miss + red detected", out.get("decision") == "block" and "720k" in out.get("reason", "")
+      and "code word" in out.get("systemMessage", ""), out)
 check("big transcript: under 3s (%.2fs)" % dt, dt < 3, dt)
 os.remove(big)
 
@@ -173,7 +202,7 @@ sys.path.insert(0, HOOKS)
 import state  # noqa
 if len(sys.argv) > 1:
     n = state.context_tokens(sys.argv[1])
-    print("real transcript context tokens:", n)
+    print("real transcript context tokens:", n, "of which conversation:", state.conversation_tokens(sys.argv[1]))
     check("real transcript tokens > 0", n > 0, n)
 
 def state_of(sid):
@@ -186,7 +215,7 @@ def note_of(out):
 
 # 15. off by default: a new chat without /fazenmemory gets nothing, even past the red marks
 s15 = new_session()
-t15 = transcript("x", tokens=500000)
+t15 = transcript("x", tokens=720000)
 for _ in range(36):
     out = run("on_prompt.py", {"session_id": s15, "prompt": "vai", "transcript_path": t15})
 check("off by default: no nudges", out == {} and not state_of(s15).get("enabled"), state_of(s15))
@@ -256,7 +285,7 @@ check("cap resets on user message", state_of(s18)["auto_continues"] == 0, state_
 os.environ["CLAUDE_CODE_SESSION_ATTENDED"] = "0"
 s19 = new_session()
 run("on_prompt.py", {"session_id": s19, "prompt": "/fazenmemory"})
-out = run("on_stop.py", {"session_id": s19, "transcript_path": transcript("Si Fratello! x", tokens=500000),
+out = run("on_stop.py", {"session_id": s19, "transcript_path": transcript("Si Fratello! x", tokens=720000),
                           "last_assistant_message": "Si Fratello! Procedo con il punto 2?"})
 check("unattended -> warn only", "decision" not in out and "systemMessage" in out, out)
 os.environ["CLAUDE_CODE_SESSION_ATTENDED"] = "1"
@@ -335,11 +364,12 @@ check("prefixed /fazenmemory off", not state_of(s22).get("enabled"), state_of(s2
 def long_turn(first, last, tokens=335000):
     path = os.path.join(tempfile.gettempdir(), "fm_t_%s.jsonl" % uuid.uuid4().hex)
     rows = [{"type": "user", "message": {"content": "Fazen Memory resume: ..."}},
-            {"type": "assistant", "message": {"content": [{"type": "text", "text": first}]}},
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": first}],
+                                              "usage": {"input_tokens": BASE}}},
             {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {}}]}},
             {"type": "user", "message": {"content": [{"type": "tool_result", "content": "ok"}]}},
             {"type": "assistant", "message": {"content": [{"type": "text", "text": last}],
-                                              "usage": {"input_tokens": tokens}}}]
+                                              "usage": {"input_tokens": BASE + tokens}}}]
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(json.dumps(r) for r in rows) + "\n")
     return path
@@ -355,8 +385,8 @@ s23 = new_session()
 run("on_prompt.py", {"session_id": s23, "prompt": "/fmcodeword"})
 out = run("on_stop.py", {"session_id": s23, "transcript_path": long_turn("Archivio la chat precedente.", "Fatto."),
                          "last_assistant_message": "Fatto."})
-check("long turn: code word in neither -> miss + block", out.get("decision") == "block"
-      and "code word" in out.get("reason", ""), out)
+check("long turn: code word in neither -> miss counted, warned, no block yet", "decision" not in out
+      and "code word" in out.get("systemMessage", "") and state_of(s23).get("misses") == 1, out)
 
 # 24. /fazenmemory status reports what the hooks really saw, and warns when their state was lost
 #     (seen live: a cleanup hook emptied the plugin data folder before every Bash call)

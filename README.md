@@ -20,19 +20,23 @@ moves the chat along three levels:
 ```mermaid
 flowchart LR
     A(["/fazenmemory"]) --> G
-    G["🟢 Green<br/>working normally"] -->|"20 exchanges<br/>or ~300k tokens"| Y
-    Y["🟡 Yellow<br/>checkpoint: recap at<br/>the end of a reply"] -->|"35 exchanges<br/>or ~450k tokens"| R
-    G -->|"code word missing<br/>in a long chat"| R
-    Y -->|"code word missing"| R
+    G["🟢 Green<br/>working normally"] -->|"20 exchanges<br/>or ~450k tokens"| Y
+    Y["🟡 Yellow<br/>checkpoint: recap at<br/>the end of a reply"] -->|"35 exchanges<br/>or ~700k tokens"| R
+    G -->|"code word missing twice<br/>in a long chat"| R
+    Y -->|"code word missing twice"| R
     R["🔴 Red<br/>automatic handoff"] --> N(["New chat, same folder,<br/>Fazen Memory already on"])
 ```
 
 - **Code word.** Claude starts every reply with a fixed phrase (default **Yes Brother!** in English,
-  **Si Fratello!** in Italian). If a reply misses it, the chat is losing track of its rules. In a
-  long chat (10+ exchanges or ~200k tokens) that triggers the handoff.
-- **Checkpoint** 🟡 at 20 exchanges or ~300k context tokens: Claude adds a compact recap to the end
-  of its reply, which brings the early decisions back into focus.
-- **Automatic handoff** 🔴 at 35 exchanges, ~450k context tokens, or a missing code word. It
+  **Si Fratello!** in Italian). If a reply misses it, the chat may be losing track of its rules. In
+  a long chat (10+ exchanges or ~200k tokens) the first miss reminds Claude of the rules; a second
+  one triggers the handoff.
+- **Tokens** count the conversation only. The fixed part of every chat (system prompt, tools,
+  skills, MCP, measured on the chat's first call) is left out, so a setup with many plugins does
+  not hand off sooner.
+- **Checkpoint** 🟡 at 20 exchanges or ~450k tokens: Claude adds a compact recap to the end of its
+  reply, which brings the early decisions back into focus.
+- **Automatic handoff** 🔴 at 35 exchanges, ~700k tokens, or a second missing code word. It
   happens once per chat.
 - **Auto-continue.** No more "Shall I continue with step 2?". An obvious continuation question is
   answered yes for you, at most 5 times per message. Never for merge, production, money, legal,
@@ -159,8 +163,8 @@ Asked when you enable the plugin; change them later in `/config` or under **Conf
 | Language | `auto`, `english`, `italian` | `auto`: Claude Code's `language` setting, otherwise your system language |
 | Default code word | any phrase | empty: **Yes Brother!** in English, **Si Fratello!** in Italian |
 
-Environment variables: `FAZEN_MEMORY_YELLOW_TOKENS` (300000), `FAZEN_MEMORY_RED_TOKENS` (450000),
-`FAZEN_MEMORY_AUTO=0` (warnings only, never a forced handoff).
+Environment variables: `FAZEN_MEMORY_YELLOW_TOKENS` (450000), `FAZEN_MEMORY_RED_TOKENS` (700000),
+both in tokens of conversation, and `FAZEN_MEMORY_AUTO=0` (warnings only, never a forced handoff).
 
 ## Privacy
 

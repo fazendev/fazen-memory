@@ -9,7 +9,8 @@
 3. A "Fazen Memory resume" message (first message of a chat opened by a handoff) turns it on and
    re-arms the code word named in the handoff file.
 4. A manual /fmhandoff marks the chat so the automatic handoff does not fire again.
-5. Counts exchanges; when on, at 20 exchanges or the yellow token mark asks for a checkpoint once.
+5. Counts exchanges; when on, at 20 exchanges or the yellow mark of conversation tokens asks for a
+   checkpoint once, and after a missed code word in a long chat reminds Claude of the rules once.
 6. /fazenmemory status gets the hooks' real data, with a warning when they missed messages.
 Never blocks the prompt. Any error exits quietly.
 """
@@ -101,7 +102,7 @@ def main():
     switch = parse_switch(prompt)
     if switch == "on":
         st["enabled"] = True
-        st["misses"] = 0
+        st["misses"] = st["late_misses"] = 0
         if not st.get("codeword"):
             st["codeword"] = state.default_phrase()
     elif switch == "off":
@@ -112,7 +113,7 @@ def main():
     if cmd and cmd[0] == "on":
         st["enabled"] = True
         st["codeword"] = cmd[1]
-        st["misses"] = 0
+        st["misses"] = st["late_misses"] = 0
     elif cmd and cmd[0] == "off":
         st["codeword"] = None
 
@@ -120,7 +121,7 @@ def main():
     if is_resume:
         st["enabled"] = True
         st["codeword"] = carried
-        st["misses"] = 0
+        st["misses"] = st["late_misses"] = 0
 
     if HANDOFF_RE.match(prompt or ""):
         st["handoff_requested"] = True
@@ -137,12 +138,17 @@ def main():
     if switch == "status":
         notes.append(status_note(st, prompt, data.get("transcript_path")))
     if st.get("enabled"):
-        tokens = state.context_tokens(data.get("transcript_path"))
+        if st.pop("remind", False) and st.get("codeword"):
+            # Never the phrase itself: the code word stays a memory test.
+            notes.append(
+                "[fazen-memory] Your last reply did not start with the code word set in this chat. "
+                "Re-read this chat's rules and start this reply and every later one with it.")
+        tokens = state.conversation_tokens(data.get("transcript_path"))
         nudged = st.setdefault("nudged", [])
         if "yellow" not in nudged and (st["turns"] >= state.YELLOW_TURNS or tokens >= state.YELLOW_TOKENS):
             nudged.append("yellow")
             notes.append((
-                "[fazen-memory] This chat is getting long ({0} exchanges, ~{1}k context tokens). "
+                "[fazen-memory] This chat is getting long ({0} exchanges, ~{1}k tokens of conversation). "
                 "First reply to the user's message exactly as you normally would, following every rule "
                 "of this chat. Then, at the end of that same reply, append a checkpoint (fmcheckpoint "
                 "skill) with health at least yellow. Do not replace the answer with it."

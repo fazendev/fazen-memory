@@ -19,8 +19,8 @@ Fazen Memory is **off** in a new chat until the user types `/fazenmemory`. A cha
 
 1. Start this reply with exactly the phrase named in this turn's `[fazen-memory]` note. No note (the hooks are not running): `Yes Brother!` if the user writes in English, `Si Fratello!` if in Italian, and say in one line that automatic checking is off until the plugin's hooks run. Follow it with a space.
 2. Confirm in at most 5 short lines, in the plugin language the note names (otherwise the user's language):
-   - Code word **<phrase>** active: a reply without it means the chat is drifting, and Fazen Memory moves to a new chat on its own.
-   - 🟡 checkpoint at 20 exchanges / ~300k tokens; 🔴 automatic handoff at 35 exchanges / ~450k tokens / missing code word.
+   - Code word **<phrase>** active: a reply without it means the chat may be drifting; in a long chat the second miss moves it to a new chat on its own.
+   - 🟡 checkpoint at 20 exchanges / ~450k tokens of conversation; 🔴 automatic handoff at 35 exchanges / ~700k tokens / code word missing twice.
    - Auto-continue on: no more "shall I continue?" on obvious next steps.
    - `/fazenmemory off` turns everything off.
 3. From now on, for the rest of this chat, follow the rules below.
